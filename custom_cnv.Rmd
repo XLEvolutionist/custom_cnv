@@ -58,4 +58,11 @@ In order to find which column is which, I grabbed the output of `ls *.bam`, givi
 8.2G -rw-rw-r-- 1 sbyfield jrigrp 8.2G Feb  2 16:00 filtered_TIL01_sorted.bam
 ```
 
-
+```{r}
+library(RCurl)
+url<-"https://raw.githubusercontent.com/XLEvolutionist/custom_cnv/master/normDepth.txt"
+data <- getURL(url,
+               ssl.verifypeer=0L, followlocation=1L)
+writeLines(data,'temp.txt')
+norm.df<-read.table("temp.txt",header=TRUE)
+norm.df<-data.table(norm.df)
