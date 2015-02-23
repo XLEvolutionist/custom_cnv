@@ -1,0 +1,61 @@
+---
+title: "Custom CNV Calling"
+author: "Simon Renny-Byfield"
+date: "February 23, 2015"
+output: html_document
+---
+
+##Introduction##
+After trying several programs trying to call CNV, we have been pretty dissatisfied with the output. Generally, the programs do not run samples together in one run, do not produce similar results with varying parameters, or true positive (TP) and false positive (FP) [as a percentage] track each other perfectly (i.e. calls are more or less random; estimates are based on a "Gold Standard" of the Swanson-Wagner CNV CGH Chip).
+
+Jeff and I decided to try writting something on our own. The approach is a simple one and there are several points to make before we begin. We will:
+
+* Focusing on genes, seeing as this is where we can call most of the SNPs anyway.
+* Use read-depth (normalized) per million per kb of gene, to inform copy number.
+* Also adjust coverage to GC conent of the gene.
+* Take advatage of B73 as a reference sample.
+
+##Generating the coverage data##
+The first task is to generate coverage data for each gene. Jeff and I decided to use strict mapping criteria, I filtered with samtools with `-MINMAPQ 30`, using something that looks like this:
+<br>
+<br/>
+`
+samtools view -bhq 30 ../$file > filtered_$file
+`
+<br>
+<br/>
+The data used are stored in `/group/jrigrp4/cn.mops/data/filtered_bams` and have been filtered to **minimum map quality of 30**. Subsequent to filterring the data I then used [`bedtools`](http://bedtools.readthedocs.org/en/latest/) to generate coverage data. This is realtively easy with a simple one liner using the `multicov` call. The followign bedtools run was executed from within the dir `/group/jrigrp4/cn.mops/data/filtered_bams`.
+<br>
+<br/>
+`
+bedtools multicov -bams *.bam -bed ../../../freec/maize3/GeneZeaRefV3.bed -q 30 -p > coverage.per.gene.txt
+`
+In order to find which column is which, I grabbed the output of `ls *.bam`, giving:
+<br>
+<br/>
+
+```{r, eval=FALSE, echo = TRUE}
+20G -rw-rw-r-- 1 sbyfield jrigrp  20G Feb  2 14:39 filtered_JRIAL2A.sorted.bam
+ 17G -rw-rw-r-- 1 sbyfield jrigrp  17G Feb  2 14:21 filtered_JRIAL2B.sorted.bam
+ 17G -rw-rw-r-- 1 sbyfield jrigrp  17G Feb  2 14:15 filtered_JRIAL2C.sorted.bam
+ 21G -rw-rw-r-- 1 sbyfield jrigrp  21G Feb  2 14:42 filtered_JRIAL2D.sorted.bam
+ 17G -rw-rw-r-- 1 sbyfield jrigrp  17G Feb  2 14:13 filtered_JRIAL2E.sorted.bam
+ 17G -rw-rw-r-- 1 sbyfield jrigrp  17G Feb  2 14:18 filtered_JRIAL2F.sorted.bam
+ 17G -rw-rw-r-- 1 sbyfield jrigrp  17G Feb  2 15:16 filtered_JRIAL2G.sorted.bam
+ 17G -rw-rw-r-- 1 sbyfield jrigrp  17G Feb  2 15:23 filtered_JRIAL2H.sorted.bam
+ 21G -rw-rw-r-- 1 sbyfield jrigrp  21G Feb  2 15:41 filtered_JRIAL2I.sorted.bam
+ 17G -rw-rw-r-- 1 sbyfield jrigrp  17G Feb  2 15:10 filtered_JRIAL2J.sorted.bam
+ 19G -rw-rw-r-- 1 sbyfield jrigrp  19G Feb  2 16:11 filtered_JRIAL2K.sorted.bam
+ 19G -rw-rw-r-- 1 sbyfield jrigrp  19G Feb  2 16:12 filtered_JRIAL2L.sorted.bam
+ 19G -rw-rw-r-- 1 sbyfield jrigrp  19G Feb  2 16:14 filtered_JRIAL2M.sorted.bam
+ 17G -rw-rw-r-- 1 sbyfield jrigrp  17G Feb  2 16:00 filtered_JRIAL2N.sorted.bam
+ 16G -rw-rw-r-- 1 sbyfield jrigrp  16G Feb  2 16:07 filtered_JRIAL2O.sorted.bam
+ 16G -rw-rw-r-- 1 sbyfield jrigrp  16G Feb  2 16:16 filtered_JRIAL2P.sorted.bam
+ 20G -rw-rw-r-- 1 sbyfield jrigrp  20G Feb  2 16:51 filtered_JRIAL2Q.sorted.bam
+ 19G -rw-rw-r-- 1 sbyfield jrigrp  19G Feb  2 16:45 filtered_JRIAL2R.sorted.bam
+ 18G -rw-rw-r-- 1 sbyfield jrigrp  18G Feb  2 16:40 filtered_JRIAL2S.sorted.bam
+ 17G -rw-rw-r-- 1 sbyfield jrigrp  17G Feb  2 16:43 filtered_JRIAL2T.sorted.bam
+8.2G -rw-rw-r-- 1 sbyfield jrigrp 8.2G Feb  2 16:00 filtered_TIL01_sorted.bam
+```
+
+
