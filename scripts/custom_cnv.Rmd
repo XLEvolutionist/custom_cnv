@@ -1,0 +1,160 @@
+---
+title: "Custom CNV Calling"
+author: "Simon Renny-Byfield"
+date: "February 23, 2015"
+output: html_document
+---
+
+##Introduction##
+After trying several programs trying to call CNV, we have been pretty dissatisfied with the output. Generally, the programs do not run samples together in one run, do not produce similar results with varying parameters, or true positive (TP) and false positive (FP) [as a percentage] track each other perfectly (i.e. calls are more or less random; estimates are based on a "Gold Standard" of the Swanson-Wagner CNV CGH Chip).
+
+Jeff and I decided to try writting something on our own. The approach is a simple one and there are several points to make before we begin. We will:
+
+* Focusing on genes, seeing as this is where we can call most of the SNPs anyway.
+* Use read-depth (normalized) per million per kb of gene, to inform copy number.
+* Also adjust coverage to GC conent of the gene.
+* Take advatage of B73 as a reference sample.
+
+##Generating the coverage data##
+The first task is to generate coverage data for each gene. Jeff and I decided to use strict mapping criteria, I filtered with samtools with `-MINMAPQ 30`, using something that looks like this:
+<br>
+<br/>
+`
+samtools view -bhq 30 ../$file > filtered_$file
+`
+<br>
+<br/>
+The data used are stored in `/group/jrigrp4/cn.mops/data/filtered_bams` and have been filtered to **minimum map quality of 30**. Subsequent to filterring the data I then used [`bedtools`](http://bedtools.readthedocs.org/en/latest/) to generate coverage data. This is realtively easy with a simple one liner using the `multicov` call. The followign bedtools run was executed from within the dir `/group/jrigrp4/cn.mops/data/filtered_bams`.
+<br>
+<br/>
+`
+bedtools multicov -bams *.bam -bed ../../../freec/maize3/GeneZeaRefV3.bed -q 30 -p > coverage.per.gene.txt
+`
+In order to find which column is which, I grabbed the output of `ls *.bam`, giving:
+<br>
+<br/>
+
+```{r, eval=FALSE, echo = TRUE}
+20G -rw-rw-r-- 1 sbyfield jrigrp  20G Feb  2 14:39 filtered_JRIAL2A.sorted.bam
+ 17G -rw-rw-r-- 1 sbyfield jrigrp  17G Feb  2 14:21 filtered_JRIAL2B.sorted.bam
+ 17G -rw-rw-r-- 1 sbyfield jrigrp  17G Feb  2 14:15 filtered_JRIAL2C.sorted.bam
+ 21G -rw-rw-r-- 1 sbyfield jrigrp  21G Feb  2 14:42 filtered_JRIAL2D.sorted.bam
+ 17G -rw-rw-r-- 1 sbyfield jrigrp  17G Feb  2 14:13 filtered_JRIAL2E.sorted.bam
+ 17G -rw-rw-r-- 1 sbyfield jrigrp  17G Feb  2 14:18 filtered_JRIAL2F.sorted.bam
+ 17G -rw-rw-r-- 1 sbyfield jrigrp  17G Feb  2 15:16 filtered_JRIAL2G.sorted.bam
+ 17G -rw-rw-r-- 1 sbyfield jrigrp  17G Feb  2 15:23 filtered_JRIAL2H.sorted.bam
+ 21G -rw-rw-r-- 1 sbyfield jrigrp  21G Feb  2 15:41 filtered_JRIAL2I.sorted.bam
+ 17G -rw-rw-r-- 1 sbyfield jrigrp  17G Feb  2 15:10 filtered_JRIAL2J.sorted.bam
+ 19G -rw-rw-r-- 1 sbyfield jrigrp  19G Feb  2 16:11 filtered_JRIAL2K.sorted.bam
+ 19G -rw-rw-r-- 1 sbyfield jrigrp  19G Feb  2 16:12 filtered_JRIAL2L.sorted.bam
+ 19G -rw-rw-r-- 1 sbyfield jrigrp  19G Feb  2 16:14 filtered_JRIAL2M.sorted.bam
+ 17G -rw-rw-r-- 1 sbyfield jrigrp  17G Feb  2 16:00 filtered_JRIAL2N.sorted.bam
+ 16G -rw-rw-r-- 1 sbyfield jrigrp  16G Feb  2 16:07 filtered_JRIAL2O.sorted.bam
+ 16G -rw-rw-r-- 1 sbyfield jrigrp  16G Feb  2 16:16 filtered_JRIAL2P.sorted.bam
+ 20G -rw-rw-r-- 1 sbyfield jrigrp  20G Feb  2 16:51 filtered_JRIAL2Q.sorted.bam
+ 19G -rw-rw-r-- 1 sbyfield jrigrp  19G Feb  2 16:45 filtered_JRIAL2R.sorted.bam
+ 18G -rw-rw-r-- 1 sbyfield jrigrp  18G Feb  2 16:40 filtered_JRIAL2S.sorted.bam
+ 17G -rw-rw-r-- 1 sbyfield jrigrp  17G Feb  2 16:43 filtered_JRIAL2T.sorted.bam
+8.2G -rw-rw-r-- 1 sbyfield jrigrp 8.2G Feb  2 16:00 filtered_TIL01_sorted.bam
+```
+
+The output of the `bedtools` call was the normalized according to this [script](https://github.com/XLEvolutionist/custom_cnv/blob/master/gene_depth.R). Briefly this involves normalizing by library size and gene size giving mapped reads per million per kb.
+
+##Assesing the data##
+
+We will now load in the data from GitHub (should work for anyone) and produce a few diagnostic plots:
+```{r,message=FALSE,warning=FALSE}
+# load in some libraries
+library(RCurl)
+library(data.table)
+library(ggplot2)
+library(reshape2)
+library(scales)
+library(EDASeq)
+# import the data from GitHub
+url<-"https://raw.githubusercontent.com/XLEvolutionist/custom_cnv/master/normDepth.txt"
+data <- getURL(url,
+               ssl.verifypeer=0L, followlocation=1L)
+writeLines(data,'temp.txt')
+norm.df<-read.table("temp.txt",header=TRUE)
+norm.df<-data.table(norm.df)
+```
+
+The next part of the analysis is to look at the distribution of read coverage for all samples:
+```{r}
+hist(x=melt(subset(norm.df,select=-c(1:4,27,28)))$value, main="coverge (all samples)", 
+      xlim=c(0,50), xlab="normalized coverage per kb",col="grey",cex.lab=1.6, breaks=5000)
+```
+
+At this stage it important to see what the distribution of this coverage is in the reference B73. Any genes that have 0 (or nearly zero) coverage in B73 should be removed. The zero is likely due to bad mapping rather than real missing data, and so we cannot trust RD estimates of these genes in the teosinte lines.
+
+```{r}
+hist(x=subset(norm.df,select="B73.bam")$B73.bam, main="coverage in B73",
+      xlim=c(0,50), xlab="normalized coverage per kb",col="grey",cex.lab=1.6, breaks=100)
+```
+
+So, many genes in b73 have zero read coverage. Thus we cannot trust estimates of CNVs over these genes and they should be removed from the analysis. We can use whatever cut-off we like but here I am picking 2 mapped reads per million per kb (mpmk). Filtering the reads happens like this:
+
+```{r,echo=FALSE}
+# remove any genes with count less that one in B73
+norm.df<-subset(norm.df,subse=norm.df$B73.bam > 2)
+```
+
+Now, lets have another look at the distribution in B73:
+
+```{r, echo = FALSE}
+#look ant the distribution of coverage in b73
+hist(norm.df$B73.bam, breaks=50, col="grey", main ="B73 trimmed",
+     xlab="normalized coverage per kb",cex.lab=1.6)
+```
+
+##GC content and adjustment with loess smoothing##
+
+So far the data look pretty good but how does GC content impact the RD estimates? It can be easily seen that GC content (already a known bias in Illumina data) can impact coverage. Here I plot GC content as a predictor of read depth over genes, using TIL01 as the sample:
+
+```{r}
+plot(norm.df$pct_gc,log(norm.df$TIL01), main="GC content and coverage", xlab="GC content (fraction)", ylab="log(mrmk)",col = alpha("cornflowerblue", 0.3), cex = 0.1)
+```
+
+Now produce the smoothed data with the `loess()` function of R. **Note** After some online research I found an R module called [`EDASeq`](http://bioconductor.org/packages/release/bioc/html/EDASeq.html) whixh can use loess smoothing to normalize counts within a library. You can use the `withinLaneNormalization` method to adjust count data according to GC content. Firstly, I must turn the coverage data set into a 
+
+```{r, echo=TRUE, eval = FALSE}
+# subset the data.frame
+countData<-subset(norm.df,select=-c(1:4,27,28))
+# turn it into a matrix
+countData<-as.matrix(countData)
+head(countData)
+# make an EDASeq Expression Set
+# countData<-newSeqExpressionSet(countData)
+# now try to normalize the data according to GC content
+gcNorm<-withinLaneNormalization(x=countData, y=norm.df$pct_gc, which="loess", round=FALSE)
+# modify make a new data.table of the gc normalized counts
+gcNorm<-data.table(gcNorm)
+
+save(gcNorm, file="gcNorm.RData")
+```
+
+The above is not executed but the outcome has been saved and is now loaded:
+```{r}
+load("gcNorm.RData")
+gcNorm<-cbind(subset(norm.df,select=c(1:4)),gcNorm,subset(norm.df, select=c(27,28)))
+#head(gcNorm)
+```
+
+So the function `withinLaneNormalization` does: "The loess normalization transforms the data by regressing the counts on y and subtracting the loess fit from the counts to remove the dependence." So we have removed the dependence of coverage on GC content. But what does the plot look like?
+
+```{r}
+plot(gcNorm$pct_gc,log(gcNorm$TIL01), main="GC content and GC normalized coverage", xlab="GC content (fraction)", ylab="log(mrmk)",col = alpha("cornflowerblue", 0.3), cex = 0.1)
+```
+
+This looks good! But the next question is to ask what about the distribution of read-depth subsequent to gc normalization:
+```{r}
+hist(gcNorm$B73.bam, col="grey", main ="B73 trimmed",
+     xlab="normalized coverage per kb",cex.lab=1.6, breaks = 60)
+```
+
+Now lets take a look at the distribution of read counts in `TIL01`, and see where the genes that are called as CNV in the Swanson-Wagner paper. This is done by subsetting the data to just those with CNV calls in TIL01 (using data.table) as such:
+```{r}
+# first load in the Swanson-Wagner data.
+
+```
