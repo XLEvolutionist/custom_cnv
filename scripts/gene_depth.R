@@ -13,10 +13,10 @@ library(reshape2)
 
 
 # set the wd
-setwd("/Users/simonrenny-byfield/CNV_PAV/gene_coverage_data/filt30")
+setwd("/Users/simonrenny-byfield/GitHubRepos/custom_cnv/data/")
 # first read in the data..
-cov.df<-fread("coverage_over_genes.txt", header=TRUE)
-gc.df<-fread("../../gene_GC.txt", header=TRUE, sep = "\t")
+cov.df<-fread("coverage.per.gene.txt", header=TRUE)
+gc.df<-fread("gene_GC.txt", header=TRUE, sep = "\t")
 
 # get rid of duplicates and merge the two tables
 setkey(cov.df, name)
@@ -32,7 +32,7 @@ cov.df<-subset(cov.df,subset=cov.df$chr %in% seq(1,10,1))
 size<-subset(cov.df,select=stop)-subset(cov.df,select=start)
 
 # normalize by column total
-norm.df<-sweep(select(cov.df,select= -c(1:4,27,28)), 2, colSums(select(cov.df,select= -c(1:4,27,28))), FUN="/")
+norm.df<-sweep(subset(cov.df,select= -c(1:4,27,28)), 2, colSums(subset(cov.df,select= -c(1:4,27,28))), FUN="/")
 norm.df<-sweep(norm.df, 2, 1e6, FUN="*")
 norm.df<-sweep(norm.df, 1, (size$stop)/1000, FUN="/")
 # bind the norm data to the old

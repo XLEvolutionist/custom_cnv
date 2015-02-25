@@ -30,12 +30,15 @@ The data used are stored in `/group/jrigrp4/cn.mops/data/filtered_bams` and have
 `
 bedtools multicov -bams *.bam -bed ../../../freec/maize3/GeneZeaRefV3.bed -q 30 > coverage.per.gene.txt
 `
+<br>
+<br/>
 In order to find which column is which, I grabbed the output of `ls *.bam`, giving:
 <br>
 <br/>
 
 ```{r, eval=FALSE, echo = TRUE}
-20G -rw-rw-r-- 1 sbyfield jrigrp  20G Feb  2 14:39 filtered_JRIAL2A.sorted.bam
+ 15G -rw-rw-r-- 1 sbyfield jrigrp  15G Feb 23 21:56 filtered_B73.bam
+ 20G -rw-rw-r-- 1 sbyfield jrigrp  20G Feb  2 14:39 filtered_JRIAL2A.sorted.bam
  17G -rw-rw-r-- 1 sbyfield jrigrp  17G Feb  2 14:21 filtered_JRIAL2B.sorted.bam
  17G -rw-rw-r-- 1 sbyfield jrigrp  17G Feb  2 14:15 filtered_JRIAL2C.sorted.bam
  21G -rw-rw-r-- 1 sbyfield jrigrp  21G Feb  2 14:42 filtered_JRIAL2D.sorted.bam
@@ -256,4 +259,6 @@ abline(v=log(mean(ratio))+linePos, col = "black", lwd=1, lty = "dashed",lend=1)
 abline(v=log(mean(ratio)), col = "black", lwd=3, lty = "solid",lend=1)
 ```
 
-The solid line is the mean, and the two dashed lines represent the proposed CNV cut offs for up and down CNV. 
+The solid line is the mean, and the two dashed lines represent the proposed CNV cut offs for up and down CNV.
+
+##Where are these CNVs in the genome?##
