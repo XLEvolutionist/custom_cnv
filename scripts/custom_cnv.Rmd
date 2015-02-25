@@ -8,12 +8,12 @@ output: html_document
 ##Introduction##
 After trying several programs trying to call CNV, we have been pretty dissatisfied with the output. Generally, the programs do not run samples together in one run, do not produce similar results with varying parameters, or true positive (TP) and false positive (FP) [as a percentage] track each other perfectly (i.e. calls are more or less random; estimates are based on a "Gold Standard" of the Swanson-Wagner CNV CGH Chip).
 
-Jeff and I decided to try writting something on our own. The approach is a simple one and there are several points to make before we begin. We will:
+Jeff and I decided to try writing something on our own. The approach is a simple one and there are several points to make before we begin. We will:
 
 * Focusing on genes, seeing as this is where we can call most of the SNPs anyway.
 * Use read-depth (normalized) per million per kb of gene, to inform copy number.
-* Also adjust coverage to GC conent of the gene.
-* Take advatage of B73 as a reference sample.
+* Also adjust coverage to GC content of the gene.
+* Take advantage of B73 as a reference sample.
 
 ##Generating the coverage data##
 The first task is to generate coverage data for each gene. Jeff and I decided to use strict mapping criteria, I filtered with samtools with `-MINMAPQ 30`, using something that looks like this:
@@ -24,11 +24,11 @@ samtools view -bhq 30 ../$file > filtered_$file
 `
 <br>
 <br/>
-The data used are stored in `/group/jrigrp4/cn.mops/data/filtered_bams` and have been filtered to **minimum map quality of 30**. Subsequent to filterring the data I then used [`bedtools`](http://bedtools.readthedocs.org/en/latest/) to generate coverage data. This is realtively easy with a simple one liner using the `multicov` call. The followign bedtools run was executed from within the dir `/group/jrigrp4/cn.mops/data/filtered_bams`.
+The data used are stored in `/group/jrigrp4/cn.mops/data/filtered_bams` and have been filtered to **minimum map quality of 30**. Subsequent to filtering the data I then used [`bedtools`](http://bedtools.readthedocs.org/en/latest/) to generate coverage data. This is relatively easy with a simple one liner using the `multicov` call. The following bedtools run was executed from within the dir `/group/jrigrp4/cn.mops/data/filtered_bams`.
 <br>
 <br/>
 `
-bedtools multicov -bams *.bam -bed ../../../freec/maize3/GeneZeaRefV3.bed -q 30 -p > coverage.per.gene.txt
+bedtools multicov -bams *.bam -bed ../../../freec/maize3/GeneZeaRefV3.bed -q 30 > coverage.per.gene.txt
 `
 In order to find which column is which, I grabbed the output of `ls *.bam`, giving:
 <br>
@@ -72,11 +72,11 @@ library(reshape2)
 library(scales)
 library(EDASeq)
 # import the data from GitHub
-url<-"https://raw.githubusercontent.com/XLEvolutionist/custom_cnv/master/normDepth.txt"
+url<-"https://raw.githubusercontent.com/XLEvolutionist/custom_cnv/master/data/normDepth.txt"
 data <- getURL(url,
                ssl.verifypeer=0L, followlocation=1L)
-writeLines(data,'temp.txt')
-norm.df<-read.table("temp.txt",header=TRUE)
+writeLines(data,'~/temp.txt')
+norm.df<-read.table("~/temp.txt",header=TRUE)
 norm.df<-data.table(norm.df)
 ```
 
@@ -97,7 +97,8 @@ So, many genes in b73 have zero read coverage. Thus we cannot trust estimates of
 
 ```{r,echo=FALSE}
 # remove any genes with count less that one in B73
-norm.df<-subset(norm.df,subse=norm.df$B73.bam > 2)
+norm.df<-subset(norm.df,subse=norm.df$B73.bam > 3)
+norm.df<-subset(norm.df,subse=norm.df$B73.bam < 15)
 ```
 
 Now, lets have another look at the distribution in B73:
@@ -105,7 +106,7 @@ Now, lets have another look at the distribution in B73:
 ```{r, echo = FALSE}
 #look ant the distribution of coverage in b73
 hist(norm.df$B73.bam, breaks=50, col="grey", main ="B73 trimmed",
-     xlab="normalized coverage per kb",cex.lab=1.6)
+     xlab="normalized coverage per kb",cex.lab=1.6, xlim=c(0,30))
 ```
 
 ##GC content and adjustment with loess smoothing##
@@ -113,48 +114,146 @@ hist(norm.df$B73.bam, breaks=50, col="grey", main ="B73 trimmed",
 So far the data look pretty good but how does GC content impact the RD estimates? It can be easily seen that GC content (already a known bias in Illumina data) can impact coverage. Here I plot GC content as a predictor of read depth over genes, using TIL01 as the sample:
 
 ```{r}
-plot(norm.df$pct_gc,log(norm.df$TIL01), main="GC content and coverage", xlab="GC content (fraction)", ylab="log(mrmk)",col = alpha("cornflowerblue", 0.3), cex = 0.1)
+plot(norm.df$pct_gc,log(norm.df$TIL01), main="GC content and coverage", xlab="GC content (fraction)", ylab="log(mrmk)",col = alpha("cornflowerblue", 0.3), cex = 0.1,xlim=c(0.15,0.9))
 ```
 
-Now produce the smoothed data with the `loess()` function of R. **Note** After some online research I found an R module called [`EDASeq`](http://bioconductor.org/packages/release/bioc/html/EDASeq.html) whixh can use loess smoothing to normalize counts within a library. You can use the `withinLaneNormalization` method to adjust count data according to GC content. Firstly, I must turn the coverage data set into a 
+Now produce the smoothed data with the `loess()` function of R. **Note** After some online research I found an R module called [`EDASeq`](http://bioconductor.org/packages/release/bioc/html/EDASeq.html) which can use loess smoothing to normalize counts within a library. You can use the `withinLaneNormalization` method to adjust count data according to GC content.  
 
 ```{r, echo=TRUE, eval = FALSE}
 # subset the data.frame
 countData<-subset(norm.df,select=-c(1:4,27,28))
 # turn it into a matrix
 countData<-as.matrix(countData)
-head(countData)
-# make an EDASeq Expression Set
-# countData<-newSeqExpressionSet(countData)
+# head(countData)
 # now try to normalize the data according to GC content
 gcNorm<-withinLaneNormalization(x=countData, y=norm.df$pct_gc, which="loess", round=FALSE)
 # modify make a new data.table of the gc normalized counts
 gcNorm<-data.table(gcNorm)
 
-save(gcNorm, file="gcNorm.RData")
+save(gcNorm, file="~/gcNorm.RData")
 ```
 
 The above is not executed but the outcome has been saved and is now loaded:
 ```{r}
-load("gcNorm.RData")
+load("~/gcNorm.RData")
 gcNorm<-cbind(subset(norm.df,select=c(1:4)),gcNorm,subset(norm.df, select=c(27,28)))
 #head(gcNorm)
 ```
 
-So the function `withinLaneNormalization` does: "The loess normalization transforms the data by regressing the counts on y and subtracting the loess fit from the counts to remove the dependence." So we have removed the dependence of coverage on GC content. But what does the plot look like?
+So the function `withinLaneNormalization` does: "The loess normalization transforms the data by regressing the counts on `y` and subtracting the loess fit from the counts to remove the dependence." So we have removed the dependence of coverage on GC content. But what does the plot look like?
 
 ```{r}
-plot(gcNorm$pct_gc,log(gcNorm$TIL01), main="GC content and GC normalized coverage", xlab="GC content (fraction)", ylab="log(mrmk)",col = alpha("cornflowerblue", 0.3), cex = 0.1)
+plot(gcNorm$pct_gc,log(gcNorm$TIL01), main="GC content and GC normalized coverage", xlab="GC content (fraction)", ylab="log(mrmk)",col = alpha("cornflowerblue", 0.3), cex = 0.1, xlim=c(0.15,0.9))
 ```
 
 This looks good! But the next question is to ask what about the distribution of read-depth subsequent to gc normalization:
 ```{r}
-hist(gcNorm$B73.bam, col="grey", main ="B73 trimmed",
-     xlab="normalized coverage per kb",cex.lab=1.6, breaks = 60)
+hist(gcNorm$B73.bam, col="grey", main ="B73 GC normalized",
+     xlab="normalized coverage per kb",cex.lab=1.6, breaks = 200, xlim=c(0,50))
 ```
 
-Now lets take a look at the distribution of read counts in `TIL01`, and see where the genes that are called as CNV in the Swanson-Wagner paper. This is done by subsetting the data to just those with CNV calls in TIL01 (using data.table) as such:
+##Comparing CNV calls##
+
+Now lets take a look at the distribution of read counts in `TIL01`, and see where the genes that are called as CNV in the Swanson-Wagner paper. This is done by sub-setting the data to just those with CNV calls in TIL01 (using data.table) as such, targeting the down CNVs first. Each vertical line is a CNV call.
 ```{r}
 # first load in the Swanson-Wagner data.
+# import the data from GitHub
+url<-"https://raw.githubusercontent.com/XLEvolutionist/custom_cnv/master/data/SW_cnv_calls.csv"
+data <- getURL(url,
+               ssl.verifypeer=0L, followlocation=1L)
+writeLines(data,'~/SW.csv')
+sw.df<-read.csv("~/SW.csv",header=TRUE)
+sw.df<-data.table(sw.df)
+# remove those genes not on the main scaffolds
+sw.df<-subset(sw.df,subset=Chromosome != "chrUN")
+# head(sw.df)
+# now grab all those genes that are not normal (i.e.  not 0)
+TIL.genes<-subset(sw.df,subset=sw.df$TIL1 != 0, select=c(GeneID,TIL1))
+TIL.up<-subset(sw.df,subset=sw.df$TIL1 == 1, select=c(GeneID,TIL1))
+TIL.down<-subset(sw.df,subset=sw.df$TIL1 == -1, select=c(GeneID,TIL1))
 
+# grab the coverage data for those genes with CNV calls
+coverage_sw<-subset(gcNorm,subset=name %in% TIL.genes$GeneID)
+# grab the coverage data for those genes with CNV calls
+down_sw<-subset(gcNorm,subset=name %in% TIL.down$GeneID, select=c(TIL01,B73.bam))
+# grab the coverage data for those genes with CNV calls
+up_sw<-subset(gcNorm,subset=name %in% TIL.up$GeneID,select=c(TIL01,B73.bam))
+dim(coverage_sw)
+dim(TIL.genes)
+
+# plot a histgoram of TIL1
+hist(gcNorm$TIL01, main ="TIL01 read-depth",
+     xlab="normalized coverage per kb",cex.lab=1.6, breaks = 5000, xlim=c(0,40))
+abline(v=down_sw$TIL01,lwd= 0.1,xpd=FALSE,col = "blue")
 ```
+
+And now how about the up CNVs?:
+
+```{r}
+hist(gcNorm$TIL01, main ="TIL01 read-depth",
+     xlab="normalized coverage per kb",cex.lab=1.6, breaks = 5000, xlim=c(0,40))
+abline(v=up_sw$TIL01,lwd= 0.1,xpd=FALSE,col="red")
+```
+
+Now what about the distribution of coverage for the Swanson-Wagner CNV calls:
+
+```{r}
+# make a ggplot data.table
+all<-cbind(as.numeric(c(up_sw$TIL01,down_sw$TIL01)),c(rep("up",length(up_sw$TIL01)),rep("down",length(down_sw$TIL01))))
+all<-data.table(all)
+all<-subset(all,subset=all$V1 < 20)
+
+q<-qplot(log(as.numeric(all$V1)+0.01), fill=factor(V2), data=all, geom="density", xlab="log(normalized coverage)",cex.axis = 1.3, cex.lab=1.5, main = "coverage in TIL01 CNV calls")
+q+scale_fill_manual(values = alpha(c("blue", "red"), .2))
+```
+
+##Trying a differnet approach##
+
+So, it appears as though both approaches (read-depth vs chip) do not jive with one another. Oh dear...
+
+Another possibility is to normalize coverage in TIL01 (and the Palmar Chico pop) with the observed coverage in the B73 reference. If you look at the coverage in B73 vs TIL01, and ask where are the CNVs, you might see an interesting pattern:
+
+```{r}
+plot(gcNorm$B73.bam,gcNorm$TIL01, log="xy", cex=0.4, col=alpha("grey",0.5), xlab="log(normalized coverage in B73)",
+      ylab="log(normalized coverage in TIL01)")
+abline(0,1)
+points(down_sw$B73.bam,down_sw$TIL01, col = "blue", cex=0.5)
+points(up_sw$B73.bam,up_sw$TIL01, col = "red", cex=0.5)
+legend(x="topright",legend=c("down","up"), col=c("blue","red"), pch = 1)
+```
+
+Most of the down CNV calls from Swanson-Wagner have lower coverage in TIL01 (at least that is somewhat re-assuring) and have "typical" coverage in B73, but sometimes much lower coverage in TIL01. The next interesting aspect of the data is to ask "what is the distribution of differences in TIL01 and B73", that is `B73/TIL01`.
+
+```{r}
+hist(log(gcNorm$TIL01/gcNorm$B73.bam), xlab="coverage difference (TIL01/B73)", col= "grey", main ="", breaks=200)
+abline(v=log(down_sw$TIL01/down_sw$B73.bam), col = "blue", lwd=0.15)
+abline(v=log(up_sw$TIL01/up_sw$B73.bam), col = "red", lwd=0.15)
+hist(log((gcNorm$TIL01/gcNorm$B73.bam)), xlab="coverage ratio (TIL01/B73)", col= alpha("grey",0.9), main ="", breaks=200, add=TRUE)
+abline(v=log(1), col = "black", lwd=5, lty = "dashed")
+```
+
+And one further question, what is the distribution of CNV calls, seperately for up and down?
+```{r}
+hist(log(down_sw$TIL01/down_sw$B73.bam), xlab="coverage ratio (TIL01/B73) over CNV", col= alpha("blue",0.3), main ="", breaks=40, xlim=c(-6,4))
+hist(log(up_sw$TIL01/up_sw$B73.bam), xlab="coverage ratio (TIL01/B73) over CNV", col= alpha("red",0.3), main ="", breaks=40, add=TRUE)
+legend(x="topright",legend=c("down","up"), col=c(alpha("blue",0.3),alpha("red",0.6)), pch = 15)
+abline(v=log(1), col = "black", lwd=5, lty = "dashed")
+```
+
+There is some overlap between the two distributions, but *up* CNV seem to be skewed to the right compared to *down* CNV. If we assume that most genes are in equal copy number in the reference (B73) and TIL01 then we can use standard deviations away from the mean to make a cut of of copy-number change. *Note* that the mean is not 0 (the log of 1, indicatin equal coverage in both TIL01 and B73), but is skewed lower than zero. This is morethan likely due to polymorphisms in TIL01 (relative to B73) preventung perfect mapping or reads and a slight reduction in read-depth.  As in [Zhou et al](http://www.nature.com/nbt/journal/vaop/ncurrent/full/nbt.3096.html#supplementary-information) we can use:
+
+* down CNV < mean x 4.69 stdev (correcting for FDR of 0.05)
+* up CNV > mean x 4.69 stdev (correcting for FDR of 0.05)
+
+using the mean of the coverage ratio (TIL01/B73).
+```{r}
+ratio<-gcNorm$TIL01/gcNorm$B73.bam
+stdev<-sd(ratio)
+linePos<-log(mean(ratio)+(4.69*stdev))
+hist(log(gcNorm$TIL01/gcNorm$B73.bam), xlab="log(coverage difference (TIL01/B73))", col= "grey", main ="", breaks=200)
+abline(v=log(mean(ratio))-linePos, col = "black", lwd=1, lty = "dashed",lend=1)
+abline(v=log(mean(ratio))+linePos, col = "black", lwd=1, lty = "dashed",lend=1)
+abline(v=log(mean(ratio)), col = "black", lwd=3, lty = "solid",lend=1)
+```
+
+The solid line is the mean, and the two dashed lines represent the proposed CNV cut offs for up and down CNV. 
