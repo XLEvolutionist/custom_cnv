@@ -74,6 +74,7 @@ library(ggplot2)
 library(reshape2)
 library(scales)
 library(EDASeq)
+library(gplots)
 # import the data from GitHub
 url<-"https://raw.githubusercontent.com/XLEvolutionist/custom_cnv/master/data/normDepth.txt"
 data <- getURL(url,
@@ -100,8 +101,10 @@ So, many genes in b73 have zero read coverage. Thus we cannot trust estimates of
 
 ```{r,echo=FALSE}
 # remove any genes with count less that one in B73
-norm.df<-subset(norm.df,subse=norm.df$B73.bam > 3)
-norm.df<-subset(norm.df,subse=norm.df$B73.bam < 15)
+norm.df<-subset(norm.df,subset=norm.df$B73.bam > 1)
+norm.df<-subset(norm.df,subset=norm.df$B73.bam < 15)
+#remove any strange genes with super high coverage, in any sample
+norm.df<-subset(norm.df,subset=apply(subset(norm.df, select=-c(1:4,27,28)),1,function(x) max(x)) < 100)
 ```
 
 Now, lets have another look at the distribution in B73:
@@ -186,7 +189,7 @@ dim(TIL.genes)
 
 # plot a histgoram of TIL1
 hist(gcNorm$TIL01, main ="TIL01 read-depth",
-     xlab="normalized coverage per kb",cex.lab=1.6, breaks = 5000, xlim=c(0,40))
+     xlab="normalized coverage per kb",cex.lab=1.6, breaks = 500, xlim=c(0,40))
 abline(v=down_sw$TIL01,lwd= 0.1,xpd=FALSE,col = "blue")
 ```
 
@@ -194,7 +197,7 @@ And now how about the up CNVs?:
 
 ```{r}
 hist(gcNorm$TIL01, main ="TIL01 read-depth",
-     xlab="normalized coverage per kb",cex.lab=1.6, breaks = 5000, xlim=c(0,40))
+     xlab="normalized coverage per kb",cex.lab=1.6, breaks = 500, xlim=c(0,40))
 abline(v=up_sw$TIL01,lwd= 0.1,xpd=FALSE,col="red")
 ```
 
@@ -202,12 +205,14 @@ Now what about the distribution of coverage for the Swanson-Wagner CNV calls:
 
 ```{r}
 # make a ggplot data.table
-all<-cbind(as.numeric(c(up_sw$TIL01,down_sw$TIL01)),c(rep("up",length(up_sw$TIL01)),rep("down",length(down_sw$TIL01))))
-all<-data.table(all)
-all<-subset(all,subset=all$V1 < 20)
-
-q<-qplot(log(as.numeric(all$V1)+0.01), fill=factor(V2), data=all, geom="density", xlab="log(normalized coverage)",cex.axis = 1.3, cex.lab=1.5, main = "coverage in TIL01 CNV calls")
-q+scale_fill_manual(values = alpha(c("blue", "red"), .2))
+all<-data.frame("depth"=log(c(as.numeric(up_sw$TIL01)+1,as.numeric(down_sw$TIL01)+1)),"call"=c(rep("up",length(up_sw$TIL01)),rep("down",length(down_sw$TIL01))))
+max(as.numeric(all$depth))
+ggplot(all, aes(x=depth)) +
+  geom_histogram(data=subset(all,subset=call =="up"), fill="red",alpha = 0.2) +
+  geom_histogram(data=subset(all,subset=call =="down"), fill="blue",alpha = 0.2) +
+  xlab("log(depth+1)")
+  #geom_density(data=subset(all,subset=call =="up"), fill="red",alpha = 0.2) +
+  #geom_density(data=subset(all,subset=call =="down"), fill="blue",alpha = 0.2) +
 ```
 
 ##Trying a differnet approach##
@@ -245,14 +250,20 @@ abline(v=log(1), col = "black", lwd=5, lty = "dashed")
 
 There is some overlap between the two distributions, but *up* CNV seem to be skewed to the right compared to *down* CNV. If we assume that most genes are in equal copy number in the reference (B73) and TIL01 then we can use standard deviations away from the mean to make a cut of of copy-number change. *Note* that the mean is not 0 (the log of 1, indicatin equal coverage in both TIL01 and B73), but is skewed lower than zero. This is morethan likely due to polymorphisms in TIL01 (relative to B73) preventung perfect mapping or reads and a slight reduction in read-depth.  As in [Zhou et al](http://www.nature.com/nbt/journal/vaop/ncurrent/full/nbt.3096.html#supplementary-information) we can use:
 
-* down CNV < mean x 4.69 stdev (correcting for FDR of 0.05)
-* up CNV > mean x 4.69 stdev (correcting for FDR of 0.05)
+```{r}
+# calculate our CNV limit based on FDR corrected p value
+limit<-qnorm(0.025/(dim(gcNorm)[1]),lower.tail=FALSE)
+```
+
+* down CNV < mean x `r limit` stdev (correcting for FDR of 0.05)
+* up CNV > mean x `r limit` stdev (correcting for FDR of 0.05)
 
 using the mean of the coverage ratio (TIL01/B73).
 ```{r}
 ratio<-gcNorm$TIL01/gcNorm$B73.bam
 stdev<-sd(ratio)
-linePos<-log(mean(ratio)+(4.69*stdev))
+# so you have to be more than limit*stdev away from the mean to be called CNV
+linePos<-log(mean(ratio)+(limit*stdev))
 hist(log(gcNorm$TIL01/gcNorm$B73.bam), xlab="log(coverage difference (TIL01/B73))", col= "grey", main ="", breaks=200)
 abline(v=log(mean(ratio))-linePos, col = "black", lwd=1, lty = "dashed",lend=1)
 abline(v=log(mean(ratio))+linePos, col = "black", lwd=1, lty = "dashed",lend=1)
@@ -260,5 +271,66 @@ abline(v=log(mean(ratio)), col = "black", lwd=3, lty = "solid",lend=1)
 ```
 
 The solid line is the mean, and the two dashed lines represent the proposed CNV cut offs for up and down CNV.
+
+##Now see what these distribution look like in Palmar Chico##
+
+The next set of graphs will not be printed to screen but saved into a pdf, one graph for each of our 20 Palmar Chico lines (and TIL01 too). It is important to remember that these Palmar Chico lines are typically not inbred like the TIL01 lines used in the ground truthing section.
+
+So the first step is to grab the sample names:
+```{r}
+samples<-colnames(gcNorm)[-c(1:4,27,28)]
+```
+
+I firstly want to check if the distribution of coverage is sensible in the 20 Palmar Chico lines...
+```{r}
+# make a matrix of 0, representing the "no evidence of change in copy-number"
+cnv.mat<-matrix(data=0,nrow=dim(gcNorm)[1],ncol=length(samples))
+rownames(cnv.mat)<-gcNorm$name
+colnames(cnv.mat)<-samples
+# head(cnv.mat)
+# open up a pdf and print the histograms
+pdf("samples_covergae.pdf")
+par(mfrow=c(3,2))
+# cycle through the samples
+for ( s in samples ) {
+  # print(s)
+  # subset the data
+  sub.df<-subset(gcNorm,select=c(s,"name"))
+  sub.df<-data.frame(sub.df)
+  # print(head(sub.df))
+  hist(sub.df[,s], main =paste0(s, " read-depth"),
+     xlab="normalized coverage per kb",cex.lab=1.4, breaks = c(seq(0,20,0.2),20.00001,max(sub.df[,s])), xlim=c(0,21), 
+     col = alpha("cornflowerblue",0.5),border=alpha("cornflowerblue",0.7))
+  # calculate the ratio between sample and reference"
+  ratio<-sub.df[,s]/subset(gcNorm,select="B73.bam")
+  ratio<-data.matrix(ratio)
+  # print(max(ratio))
+  # plot the ratio as a histogram
+  hist(log(ratio), main=paste0(s," ratio (sample/ref)"),
+     cex.lab=1.4, xlab="log(coverage difference (sample/ref))", col=alpha("cornflowerblue",0.4),
+     border=alpha("cornflowerblue",0.4), breaks=200)
+  # calculate the CNV "limit"
+  stdev<-sd(ratio)
+  limit<-qnorm(0.025/(dim(gcNorm)[1]),lower.tail=FALSE)
+  linePos<-log(mean(ratio)+(limit*stdev))
+  abline(v=log(mean(ratio))-linePos, col = "black", lwd=1, lty = "dashed",lend=1)
+  abline(v=log(mean(ratio))+linePos, col = "black", lwd=1, lty = "dashed",lend=1)
+  abline(v=log(mean(ratio)), col = "black", lwd=2, lty = "solid",lend=1)
+  #turn sub.df back into a data.table
+  sub.df<-data.table(sub.df,ratio)
+  # call up CNV
+  up<-subset(sub.df,subset=log(sub.df$B73.bam) > log(mean(ratio))+linePos)
+  cnv.mat[rownames(cnv.mat) %in% up$name,s]<-1
+  down<-subset(sub.df,subset=log(sub.df$B73.bam) < log(mean(ratio))-linePos)
+  cnv.mat[rownames(cnv.mat) %in% down$name,s]<--1
+}
+dev.off()
+# remove B73...
+cnv.mat<-cnv.mat[,-1]
+# remove all rows with zero
+cnv.mat<-cnv.mat[apply(cnv.mat,1,function(x) !all(x == 0)),]
+# head(cnv.mat)
+heatmap.2(cnv.mat, trace="none",key.title ="",density.info="none",labRow="",col=c("mediumblue","black","red3"))
+```
 
 ##Where are these CNVs in the genome?##
