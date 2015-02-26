@@ -75,6 +75,7 @@ library(reshape2)
 library(scales)
 library(EDASeq)
 library(gplots)
+library(pheatmap)
 # import the data from GitHub
 url<-"https://raw.githubusercontent.com/XLEvolutionist/custom_cnv/master/data/normDepth.txt"
 data <- getURL(url,
@@ -330,7 +331,29 @@ cnv.mat<-cnv.mat[,-1]
 # remove all rows with zero
 cnv.mat<-cnv.mat[apply(cnv.mat,1,function(x) !all(x == 0)),]
 # head(cnv.mat)
-heatmap.2(cnv.mat, trace="none",key.title ="",density.info="none",labRow="",col=c("mediumblue","black","red3"))
+#heatmap.2(cnv.mat, trace="none",key.title ="",density.info="none",labRow="",col=c("mediumblue","black","red3"))
+pheatmap(cnv.mat,treeheight_row = 0, treeheight_col = 100, show_rownames = 0)
+```
+
+##What about a SFS for the deletions##
+
+So what is the site frequency spectrum for CNVs (not SNPs within CNV regions but the CNV themselves).
+
+```{r}
+sfs<-apply(cnv.mat[,-21],1,function(x) table(x)[1])
+#remove 0, as there is
+hist(sfs,xlim=c(1,21), breaks = 20, col = "grey",main="Site Frequency Spectrum of down CNV")
 ```
 
 ##Where are these CNVs in the genome?##
+
+```{r}
+# import the chr length data from GitHub
+url<-"https://raw.githubusercontent.com/XLEvolutionist/custom_cnv/master/data/chrLenFile.txt"
+data <- getURL(url,
+               ssl.verifypeer=0L, followlocation=1L)
+writeLines(data,'~/chr_len.txt')
+clen.df<-read.table("~/chr_len.txt",header=FALSE)
+#colnames(clen.df)<-c("name","chr","length")
+#plot(seq(0,sum(clen.df[,3]),by=sum(clen.df[,3])),0:1, chr)
+```
