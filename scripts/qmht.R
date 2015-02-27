@@ -37,7 +37,7 @@ quickMHTplot <- function(res=res, cex=.9, pch=16, col=rep(c("slateblue", "cyan4"
 
 
 
-newpos <- function (dataframe, GAP = 5e+06, cl) 
+newpos <- function (dataframe, GAP = 5e+06, clfile) 
 {
   d <- dataframe
   if (!("chr" %in% names(d) & "pos" %in% names(d))){
