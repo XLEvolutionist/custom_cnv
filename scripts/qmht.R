@@ -9,11 +9,7 @@ quickMHTplot <- function(res=res, cex=.9, pch=16, col=rep(c("slateblue", "cyan4"
                          col2plot="ModelFreq", ... ){
   
   #res: a data.frame; must has chr, pos, and a col to plot
-  
-  
-  
-  
-  
+
   #source("~/Documents/Rcodes/newpos.R")
   res <- newpos(res, GAP = GAP, cl=clfile)
   chrtick <- chrline_tick(GAP = GAP, cl=clfile)
@@ -48,7 +44,7 @@ newpos <- function (dataframe, GAP = 5e+06, cl)
     stop("Make sure your data frame contains columns chr and pos")
   }
   cl$accumpos <- cl$BP
-  cl <- cl[order(cl$CHR), ]
+  #cl <- cl[order(cl$CHR), ]
   d$newpos <- d$pos;
   for (i in 2:10) {
     cl[cl$CHR == i, ]$accumpos <- cl[cl$CHR == (i - 1), ]$accumpos + cl[cl$CHR == i, ]$accumpos + GAP
