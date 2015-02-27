@@ -48,7 +48,7 @@ newpos <- function (dataframe, GAP = 5e+06, clfile=clfile)
     stop("Make sure your data frame contains columns chr and pos")
   }
     
-  cl <- read.csv(clfile)
+  cl <- clfile
   cl$accumpos <- cl$BP
   cl <- cl[order(cl$CHR), ]
   d$newpos <- d$pos;
@@ -61,7 +61,7 @@ newpos <- function (dataframe, GAP = 5e+06, clfile=clfile)
 
 chrline_tick <- function(GAP=5e+06, clfile=clfile){
   #xscale:
-  cl <- read.csv(clfile)
+  cl <- clfile
   names(cl) <- c("chr", "snp", "pos")
   cl <- newpos(cl, GAP=GAP)
     
