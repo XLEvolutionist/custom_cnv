@@ -60,7 +60,7 @@ newpos <- function (dataframe, GAP = 5e+06, cl)
 chrline_tick <- function(GAP=5e+06, cl){
   #xscale:
   colnames(cl) <- c("chr", "snp", "pos")
-  cl <- newpos(cl, GAP=GAP)
+  cl <- newpos(cl=clfile, GAP=GAP)
     
   cl$ticks <- cl$pos[1]/2
   cl$chrlines <- cl$pos[1]+GAP/2
