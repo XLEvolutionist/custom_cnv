@@ -6,7 +6,7 @@
 
 quickMHTplot <- function(res=res, cex=.9, pch=16, col=rep(c("slateblue", "cyan4"), 5), clfile="~/chr_len.txt",
                          GAP=5e+06, yaxis=NULL,
-                         col2plot="CNV calls", ... ){
+                         col2plot="", ... ){
   
   #res: a data.frame; must has chr, pos, and a col to plot
   
