@@ -41,14 +41,12 @@ quickMHTplot <- function(res=res, cex=.9, pch=16, col=rep(c("slateblue", "cyan4"
 
 
 
-newpos <- function (dataframe, GAP = 5e+06, clfile=clfile) 
+newpos <- function (dataframe, GAP = 5e+06, cl=clfile) 
 {
   d <- dataframe
   if (!("chr" %in% names(d) & "pos" %in% names(d))){
     stop("Make sure your data frame contains columns chr and pos")
   }
-    
-  cl <- clfile
   cl$accumpos <- cl$BP
   cl <- cl[order(cl$CHR), ]
   d$newpos <- d$pos;
@@ -59,9 +57,8 @@ newpos <- function (dataframe, GAP = 5e+06, clfile=clfile)
   return(d)
 }
 
-chrline_tick <- function(GAP=5e+06, clfile=clfile){
+chrline_tick <- function(GAP=5e+06, cl=clfile){
   #xscale:
-  cl <- clfile
   colnames(cl) <- c("chr", "snp", "pos")
   cl <- newpos(cl, GAP=GAP)
     
