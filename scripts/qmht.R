@@ -15,8 +15,8 @@ quickMHTplot <- function(res=res, cex=.9, pch=16, col=rep(c("slateblue", "cyan4"
   
   
   #source("~/Documents/Rcodes/newpos.R")
-  res <- newpos(res, GAP = GAP, clfile=clfile)
-  chrtick <- chrline_tick(GAP = GAP, clfile=clfile)
+  res <- newpos(res, GAP = GAP, cl=clfile)
+  chrtick <- chrline_tick(GAP = GAP, cl=clfile)
   
   #### setup the cavon
   if(is.null(yaxis)){
