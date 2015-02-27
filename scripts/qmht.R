@@ -4,7 +4,7 @@
 # updated: 7/14/2014
 # Jinliang Yang
 
-quickMHTplot <- function(res=res, cex=.9, pch=16, col=rep(c("slateblue", "cyan4"), 5), clfile=clfile,
+quickMHTplot <- function(res=res, cex=.9, pch=16, col=rep(c("slateblue", "cyan4"), 5), clfile,
                          GAP=5e+06, yaxis=NULL,
                          col2plot="ModelFreq", ... ){
   
