@@ -4,9 +4,9 @@
 # updated: 7/14/2014
 # Jinliang Yang
 
-quickMHTplot <- function(res=res, cex=.9, pch=16, col=rep(c("slateblue", "cyan4"), 5), clfile="~/chr_len.txt",
+quickMHTplot <- function(res=res, cex=.9, pch=16, col=rep(c("slateblue", "cyan4"), 5), clfile=clfile,
                          GAP=5e+06, yaxis=NULL,
-                         col2plot="", ... ){
+                         col2plot="ModelFreq", ... ){
   
   #res: a data.frame; must has chr, pos, and a col to plot
   
@@ -41,7 +41,7 @@ quickMHTplot <- function(res=res, cex=.9, pch=16, col=rep(c("slateblue", "cyan4"
 
 
 
-newpos <- function (dataframe, GAP = 5e+06, clfile="~/chr_len.txt") 
+newpos <- function (dataframe, GAP = 5e+06, clfile="~/Documents/Rcodes/chr_length_B73v2.csv") 
 {
   d <- dataframe
   if (!("chr" %in% names(d) & "pos" %in% names(d))){
