@@ -6,7 +6,7 @@
 
 quickMHTplot <- function(res=res, cex=.9, pch=16, col=rep(c("slateblue", "cyan4"), 5), clfile,
                          GAP=5e+06, yaxis=NULL,
-                         col2plot="ModelFreq", ... ){
+                         col2plot="qval", ... ){
   
   #res: a data.frame; must has chr, pos, and a col to plot
 
