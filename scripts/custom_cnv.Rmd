@@ -312,6 +312,7 @@ for ( s in samples ) {
   stdev<-sd(ratio)
   d<-(mean(ratio)-ratio)
   qVal<-pnorm(q=d,mean=0,sd=stdev)
+  q.mat[,s]<- -log(qVal)
   # print(max(ratio))
   # plot the ratio as a histogram
   hist(ratio, main=paste0(s," ratio (sample/ref)"),
@@ -334,23 +335,15 @@ for ( s in samples ) {
   cnv.mat[rownames(cnv.mat) %in% down$name,s]<--1
 }
 dev.off()
-# remove B73 and TIL01
+# remove B73 and TIL01, and the inbred
 cnv.mat<-cnv.mat[,-c(1,22)]
 # remove all rows with zero
 cnv.mat<-cnv.mat[apply(cnv.mat,1,function(x) !all(x == 0)),]
 print(dim(cnv.mat))
+#save the CNV calls
+save(file="cnvCall.RData", cnv.mat)
 #heatmap.2(cnv.mat, trace="none",key.title ="",density.info="none",labRow="",col=c("mediumblue","black","red3"))
 pheatmap(cnv.mat,treeheight_row = 0, treeheight_col = 100, show_rownames = 0)
-```
-
-##What about a SFS for the deletions##
-
-So what is the site frequency spectrum for CNVs (not SNPs within CNV regions but the CNV themselves).
-
-```{r}
-sfs<-apply(cnv.mat,1,function(x) table(x)[1])
-#remove 0, as there is
-hist(sfs,xlim=c(1,21), breaks = 20, col = "grey",main="Site Frequency Spectrum of down CNV")
 ```
 
 ##Where are these CNVs in the genome?##
@@ -361,16 +354,85 @@ url<-"https://raw.githubusercontent.com/XLEvolutionist/custom_cnv/master/data/ch
 data <- getURL(url,
                ssl.verifypeer=0L, followlocation=1L)
 writeLines(data,'~/chr_len.txt')
-clen.df<-read.table("~/chr_len.txt",header=FALSE)
-# source some of Jinliang's scrip to draw a nice manhattan style plot
-url<-"https://raw.githubusercontent.com/XLEvolutionist/custom_cnv/master/scripts/qmht.R"
-data <- getURL(url,
-               ssl.verifypeer=0L, followlocation=1L)
-writeLines(data,'~/qmht.R')
-source("~/qmht.R")
-#quickMHTplot()
+clen.df<-read.csv("~/chr_len.txt",header=TRUE)
 
-# now make a data.frame to send to the function.
-#res<-data.frame()
+# # now make a data.frame to send to the function using whatever sample
+ res<-data.frame("chr"=gcNorm$chr,"pos"=gcNorm$start,"qval"=q.mat[,"JRIAL2J"])
+# find the unique chr names
+chrs<-unique(res$chr)
+
+# write my own function to calculate a manhattan plot
+#define a useful function
+
+manplot<-function(dt,chr,cols=rainbow(n=10),lim=-log(pnorm(q=limit*stdev,mean=0,sd=stdev,lower.tail=F))) {
+  # first calculate the total length of the genome of and the position of the chromosomal tick marks
+  total<-sum(chr$BP)
+  #now calculate the tick marks at the end of each chromosome.
+  ticks<-c(0,cumsum(chr$BP))
+  # now the mid point range (i.e where to put the labels)
+  midPoint<-NULL
+  for ( i in 2:length(ticks) ) {
+      midPoint[i]<-ticks[i-1]+((ticks[i]-ticks[i-1])/2)
+  }
+  # save the original positions for use later
+  positionOri<-dt$pos
+  #make a new value for position, as if the chromosomes were laid end to end
+  for ( i in 1:length(chr$CHR) ) {
+    # grab the total to add
+    dt$pos[dt$chr==i]<-ticks[i]+dt$pos[dt$chr==i]
+  } #for
+  midPoint<-midPoint[-1]
+  # now find all the unique chromosome names
+  chrs<-unique(chr$CHR)
+  plot(dt$pos, dt$qval, xaxt="n", xlab="chromosome", ylab="qvalue", col=cols[i],cex=.7,pch=16, type= "n", bty="n",cex.lab=1.3)
+  for ( i in 1:length(chrs) ) {
+    points(dt$pos[dt$chr==i], dt$qval[dt$chr==i], xaxt="n", col=cols[i],cex=.7,pch=16)
+  }
+  axis(1,at=midPoint,labels=chr$CHR, tick = F,cex.axis=1.3)
+  axis(1,at=ticks,labels=F, tick = T)
+  abline(h=lim,lwd=2,lty=1)
+  # now for each chromosome plot the data
+  for ( i in 1:length(chrs) ) {
+    plot(positionOri[dt$chr==i], dt$qval[dt$chr==i], col="black",cex=.7,pch=16, xlab="chromosome", ylab="qvalue")
+    abline(h=lim,lwd=2,lty=1)
+  }
+}
+
+#draw the plots
+pdf("test.pdf",width=7,height=5)
+par(mfrow=c(1,1))
+manplot(res,chr=clen.df)
+dev.off()
 
 ```
+![CNV calls in one teosinte individual](/Users/simonrenny-byfield/GitHubRepos/custom_cnv/data/qvaluePlot.png)
+
+##What about a SFS for the deletions##
+
+```{r}
+data.19<-cnv.mat[apply(cnv.mat,1,function(x) length(which(x ==-1))==19),]
+table(apply(data.19,1,function(x) which( x == 0)))
+```
+
+```{r}
+# fist remove genes with up CNVs, in any individual.
+cnv.mat<-cnv.mat[apply(cnv.mat,1,function(x) !any(x == 1)),]
+# now figure out how many samples are down CNV for each gene
+
+
+sfs<-apply(cnv.mat,1,function(x) table(x)[1])
+#remove 0, as there is
+hist(sfs,xlim=c(1,20), breaks = 19, col = "grey",main="Site Frequency Spectrum of down CNV")
+
+```
+
+##Grouping genes by number if down CNVs##
+
+The next step is to group genes based on how many of the 20 teosinte individuals have down CNV calls. These groups will later be used to estimate the SFS over CNV regions and they will be provided as regions files for ANGSD to use.
+
+The R function `table()` can be used to call these groups. 
+
+```{r}
+
+```
+
