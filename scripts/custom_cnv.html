@@ -118,6 +118,7 @@ library(scales)
 library(EDASeq)
 library(gplots)
 library(pheatmap)
+library(fields)
 # import the data from GitHub
 url&lt;-&quot;https://raw.githubusercontent.com/XLEvolutionist/custom_cnv/master/data/normDepth.txt&quot;
 data &lt;- getURL(url,
@@ -422,6 +423,50 @@ hist(sfs,xlim=c(1,20), breaks = 19, col = &quot;grey&quot;,main=&quot;Site Frequ
 <h2>Grouping genes by number if down CNVs</h2>
 <p>The next step is to group genes based on how many of the 20 teosinte individuals have down CNV calls. These groups will later be used to estimate the SFS over CNV regions and they will be provided as regions files for ANGSD to use.</p>
 <p>The R function <code>table()</code> can be used to call these groups.</p>
+<pre class="r"><code>groups&lt;-cut(sfs, breaks=c(0,5,10,15,20))
+# now save teh gene names in each group
+group1&lt;-rownames(cnv.mat)[which(groups == unique(groups)[1])]
+group2&lt;-rownames(cnv.mat)[which(groups == unique(groups)[2])]
+group3&lt;-rownames(cnv.mat)[which(groups == unique(groups)[3])]
+group4&lt;-rownames(cnv.mat)[which(groups == unique(groups)[4])]
+
+# for each list of genes
+grp&lt;-list(group1,group2,group3,group4)
+
+for ( i in 1:length(grp)) {
+  # now get the gene co-ordinates for each group
+  genes&lt;-subset(gcNorm,subset=as.character(gcNorm$name) %in% as.vector(grp[[i]]), select=c(1:4))
+  print(head(genes))
+  write.table(file=paste0(&quot;group&quot;,i,&quot;.txt&quot;),genes, quote=F)
+}</code></pre>
+<pre><code>##        name chr     start      stop
+## 1: AC152495  10   3283522   3287418
+## 2: AC155352   2  35349359  35352189
+## 3: AC177900   1  91096808  91097170
+## 4: AC177905   1 115624175 115624687
+## 5: AC177911   1  16789304  16789867
+## 6: AC177922   3  74807795  74808415
+##        name chr     start      stop
+## 1: AC177890   1 282753810 282754304
+## 2: AC177908   1  72698779  72699510
+## 3: AC184857   5  15408973  15409701
+## 4: AC186283   1 108665035 108665544
+## 5: AC186408   4 184419768 184420547
+## 6: AC187142   6 123954182 123954457
+##        name chr     start      stop
+## 1: AC185108   7 162223698 162224084
+## 2: AC186329   2  49947660  49948234
+## 3: AC186563   4 176841202 176841483
+## 4: AC186656   1 288714863 288715189
+## 5: AC187037   8 147250946 147251552
+## 6: AC187067   7 175773542 175773997
+##        name chr     start      stop
+## 1: AC185610   1 251564403 251564738
+## 2: AC185642   4 164761947 164762273
+## 3: AC186406   6  14950899  14953486
+## 4: AC186828   6  77425455  77425883
+## 5: AC187082   7  38948716  38951510
+## 6: AC187460   7  86304275  86304646</code></pre>
 </div>
 
 

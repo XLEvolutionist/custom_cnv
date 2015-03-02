@@ -76,6 +76,7 @@ library(scales)
 library(EDASeq)
 library(gplots)
 library(pheatmap)
+library(fields)
 # import the data from GitHub
 url<-"https://raw.githubusercontent.com/XLEvolutionist/custom_cnv/master/data/normDepth.txt"
 data <- getURL(url,
@@ -433,6 +434,22 @@ The next step is to group genes based on how many of the 20 teosinte individuals
 The R function `table()` can be used to call these groups. 
 
 ```{r}
+groups<-cut(sfs, breaks=c(0,5,10,15,20))
+# now save teh gene names in each group
+group1<-rownames(cnv.mat)[which(groups == unique(groups)[1])]
+group2<-rownames(cnv.mat)[which(groups == unique(groups)[2])]
+group3<-rownames(cnv.mat)[which(groups == unique(groups)[3])]
+group4<-rownames(cnv.mat)[which(groups == unique(groups)[4])]
+
+# for each list of genes
+grp<-list(group1,group2,group3,group4)
+
+for ( i in 1:length(grp)) {
+  # now get the gene co-ordinates for each group
+  genes<-subset(gcNorm,subset=as.character(gcNorm$name) %in% as.vector(grp[[i]]), select=c(1:4))
+  #print(head(genes))
+  write.table(file=paste0("group",i,".txt"),genes, quote=F)
+}
 
 ```
 
