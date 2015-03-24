@@ -77,6 +77,12 @@ library(EDASeq)
 library(gplots)
 library(pheatmap)
 library(fields)
+library(vioplot)
+library(GenomicRanges)
+
+# first take a look at the inbreeding coeff
+inbred<-scan("/Users/simonrenny-byfield/GitHubRepos/custom_cnv/teo_parents20e-6.indF")
+hist(inbred, breaks = 25, col="grey", main="inbreeding coefficient", xlab="fixation index")
 # import the data from GitHub
 url<-"https://raw.githubusercontent.com/XLEvolutionist/custom_cnv/master/data/normDepth.txt"
 data <- getURL(url,
@@ -134,11 +140,11 @@ countData<-subset(norm.df,select=-c(1:4,27,28))
 countData<-as.matrix(countData)
 # head(countData)
 # now try to normalize the data according to GC content
-gcNorm<-withinLaneNormalization(x=countData, y=norm.df$pct_gc, which="loess", round=FALSE)
+#gcNorm<-withinLaneNormalization(x=countData, y=norm.df$pct_gc, which="loess", round=FALSE)
 # modify make a new data.table of the gc normalized counts
-gcNorm<-data.table(gcNorm)
+#gcNorm<-data.table(gcNorm)
 
-save(gcNorm, file="~/gcNorm.RData")
+#save(gcNorm, file="~/gcNorm.RData")
 ```
 
 The above is not executed but the outcome has been saved and is now loaded:
@@ -289,6 +295,9 @@ I firstly want to check if the distribution of coverage is sensible in the 20 Pa
 cnv.mat<-matrix(data=0,nrow=dim(gcNorm)[1],ncol=length(samples))
 rownames(cnv.mat)<-gcNorm$name
 colnames(cnv.mat)<-samples
+lims<-NULL
+stddevs<-NULL
+mS<-NULL
 # make a matrix to store a q-vlaue style number for each gene
 q.mat<-cnv.mat
 # head(cnv.mat)
@@ -311,7 +320,9 @@ for ( s in samples ) {
   ratio<-log(ratio+0.1)
   #ratio<-log(ratio1)
   stdev<-sd(ratio)
+  stddevs<-c(stddevs,stdev)
   d<-(mean(ratio)-ratio)
+  # lower tail might not be correct.
   qVal<-pnorm(q=d,mean=0,sd=stdev)
   q.mat[,s]<- -log(qVal)
   # print(max(ratio))
@@ -321,23 +332,29 @@ for ( s in samples ) {
      border=alpha("cornflowerblue",0.4), breaks=200)
   # calculate the CNV "limit
   #limit<-qnorm(0.05/(dim(gcNorm)[1]),lower.tail=FALSE)
-  limit<-3
+  limit<-2
   linePos<-mean(ratio)+(limit*stdev)
-  abline(v=mean(ratio)-abs(mean(ratio)+linePos), col = "black", lwd=1, lty = "dashed",lend=1)
-  abline(v=mean(ratio)+(mean(ratio)+linePos), col = "black", lwd=1, lty = "dashed",lend=1)
+  lims<-c(lims,min(mean(ratio)+linePos),abs(mean(ratio)-linePos))
   abline(v=mean(ratio), col = "black", lwd=2, lty = "solid",lend=1)
   #turn sub.df back into a data.table
   sub.df<-data.table(sub.df,ratio)
+  ratio.df<-data.table(sub.df,ratio)
   # call up CNV
   up<-subset(sub.df,subset=sub.df$B73.bam > mean(ratio)+linePos)
   cnv.mat[rownames(cnv.mat) %in% up$name,s]<-1
   # call the down CNV
   down<-subset(sub.df,subset=sub.df$B73.bam < -abs(mean(ratio)-linePos))
   cnv.mat[rownames(cnv.mat) %in% down$name,s]<--1
+  #double check that the calls are in the right place
+  abline(v=down$B73.bam, col="red", lwd=0.6, lty="solid", lend=1)
+  abline(v=up$B73.bam, col="blue", lwd=0.6, lty="solid", lend=1)
+  abline(v=mean(ratio)-abs(linePos), col = "black", lwd=1, lty = "dashed",lend=1)
+  abline(v=mean(ratio)+(linePos), col = "black", lwd=1, lty = "dashed",lend=1)
 }
 dev.off()
 # remove B73 and TIL01, and the inbred
 cnv.mat<-cnv.mat[,-c(1,22)]
+print(dim(cnv.mat))
 # remove all rows with zero
 cnv.mat<-cnv.mat[apply(cnv.mat,1,function(x) !all(x == 0)),]
 print(dim(cnv.mat))
@@ -358,14 +375,14 @@ writeLines(data,'~/chr_len.txt')
 clen.df<-read.csv("~/chr_len.txt",header=TRUE)
 
 # # now make a data.frame to send to the function using whatever sample
- res<-data.frame("chr"=gcNorm$chr,"pos"=gcNorm$start,"qval"=q.mat[,"JRIAL2J"])
+ res<-data.frame("chr"=gcNorm$chr,"pos"=gcNorm$start,"qval"=q.mat[,"JRIAL2D"])
 # find the unique chr names
 chrs<-unique(res$chr)
 
 # write my own function to calculate a manhattan plot
 #define a useful function
 
-manplot<-function(dt,chr,cols=rainbow(n=10),lim=-log(pnorm(q=limit*stdev,mean=0,sd=stdev,lower.tail=F))) {
+manplot<-function(dt,chr,cols=rainbow(n=10),lim=-log(pnorm(q=lims[5],mean=0,sd=stddevs[5],lower.tail=FALSE))) {
   # first calculate the total length of the genome of and the position of the chromosomal tick marks
   total<-sum(chr$BP)
   #now calculate the tick marks at the end of each chromosome.
@@ -390,7 +407,7 @@ manplot<-function(dt,chr,cols=rainbow(n=10),lim=-log(pnorm(q=limit*stdev,mean=0,
     points(dt$pos[dt$chr==i], dt$qval[dt$chr==i], xaxt="n", col=cols[i],cex=.7,pch=16)
   }
   axis(1,at=midPoint,labels=chr$CHR, tick = F,cex.axis=1.3)
-  axis(1,at=ticks,labels=F, tick = T)
+  axis(1,at=ticks,labels=FALSE, tick = TRUE)
   abline(h=lim,lwd=2,lty=1)
   # now for each chromosome plot the data
   for ( i in 1:length(chrs) ) {
@@ -417,13 +434,13 @@ table(apply(data.19,1,function(x) which( x == 0)))
 
 ```{r}
 # fist remove genes with up CNVs, in any individual.
-cnv.mat<-cnv.mat[apply(cnv.mat,1,function(x) !any(x == 1)),]
+cnv.mat2<-cnv.mat[apply(cnv.mat,1,function(x) !any(x == 1)),]
 # now figure out how many samples are down CNV for each gene
 
-
-sfs<-apply(cnv.mat,1,function(x) table(x)[1])
+par(mfrow=c(1,1))
+sfs<-apply(cnv.mat2,1,function(x) table(x)[1])
 #remove 0, as there is
-hist(sfs,xlim=c(1,20), breaks = 19, col = "grey",main="Site Frequency Spectrum of down CNV")
+hist(sfs,xlim=c(1,20), breaks = 19, col = "grey",main="Site Frequency Spectrum of down CNV", xlab="CNV frequency", ylab="counts", cex.lab=1.3)
 
 ```
 
@@ -436,20 +453,524 @@ The R function `table()` can be used to call these groups.
 ```{r}
 groups<-cut(sfs, breaks=c(0,5,10,15,20))
 # now save teh gene names in each group
-group1<-rownames(cnv.mat)[which(groups == unique(groups)[1])]
-group2<-rownames(cnv.mat)[which(groups == unique(groups)[2])]
-group3<-rownames(cnv.mat)[which(groups == unique(groups)[3])]
-group4<-rownames(cnv.mat)[which(groups == unique(groups)[4])]
+group1<-rownames(cnv.mat)[which(groups == levels(groups)[1])]
+group2<-rownames(cnv.mat)[which(groups == levels(groups)[2])]
+group3<-rownames(cnv.mat)[which(groups == levels(groups)[3])]
+group4<-rownames(cnv.mat)[which(groups == levels(groups)[4])]
 
 # for each list of genes
 grp<-list(group1,group2,group3,group4)
-
+nullGenes<-gcNorm
 for ( i in 1:length(grp)) {
   # now get the gene co-ordinates for each group
   genes<-subset(gcNorm,subset=as.character(gcNorm$name) %in% as.vector(grp[[i]]), select=c(1:4))
+  nullGenes<-subset(nullGenes,subset=!as.character(nullGenes$name) %in% as.vector(grp[[i]]), select=c(1:4))
   #print(head(genes))
-  write.table(file=paste0("group",i,".txt"),genes, quote=F)
+  genes<-data.frame(genes)
+  genes<-genes[order(genes$chr,genes$start,decreasing=FALSE),]
+  write.table(file=paste0("group",i,".txt"),genes, quote=FALSE)
 }
+
+#write out the null genes (i.e. those with no CNV calls)
+nullGenes<-nullGenes[order(nullGenes$chr,nullGenes$start,decreasing=FALSE),]
+write.table(file=paste0("group",i+1,".txt"),nullGenes, quote=FALSE)
+```
+
+The output from this was converted to a ["regionfile"](http://www.popgen.dk/angsd/index.php/Regionfile) suitable for input into `angsd` using the followign perl script:
+```
+#!/usr/bin/perl
+use strict;
+use warnings;
+
+# usage script.pl <input>
+
+# Simon Renny-Byfield, UC Davis, December 2014, version 1
+# A script to conver .bed style files to "region files" for 
+# angsd input.
+
+# takes input like this:
+# 1 AC177899 1 300424022 300426500
+# 2 AC177922 3 74807795 74808415
+# 3 AC177926 1 295676620 295677276
+# 4 AC177947 1 33360058 33360669
+# 5 AC183372 3 141361115 141361927
+
+#to
+
+# Chr1:1000-2000
+
+#if you have different input change the column number in the loop below
+
+#open the input file
+open ( IN , $ARGV[0] ) || die "Could not open file $ARGV[0]: $!\n";
+
+#cycle thru the input file
+while ( <IN> ) {
+  next if m/start/;
+	my @data = split , "\s+";
+	print $data[2] , ":" , $data[3] , "-" , $data[4] , "\n";
+}#while
+
+exit;
+```
+
+The files were moved over to `farm` and the following analyses were performed in `angsd`.
+
+```
+#!/bin/bash -l
+#!/bin/bash
+#OUTDIR=/group/jrigrp4/cn.mops/data/filtered_bams
+#SBATCH -D /group/jrigrp4/custom_cnv/sfs
+#SBATCH -o /group/jrigrp4/custom_cnv/logs/sfs_out_log-%j.txt
+#SBATCH -e /group/jrigrp4/custom_cnv/logs/sfs_err_log-%j.txt
+#SBATCH -J bSFS
+#SBATCH --array=0
+#SBATCH --mem-per-cpu=8000
+#SBATCH --cpus-per-task=12
+
+##Simon Renny-Byfield, UC Davis, March 2015
+
+echo "Starting Job:"
+date
+
+cd ../data
+
+files=(*.region)
+
+cd ../sfs
+
+#now sfs for each .region file
+
+# calculate the .saf file
+cmd="angsd -bam ../../teosinte_parents/file.list.txt -doSaf 2 -out $SLURM_ARRAY_TASK_ID.teoparents20 -anc ../../teosinte_parents/genomes/TRIP.fa -ref ../../teosinte_parents/genomes/Zea_mays.AGPv3.22.dna.genome.fa -GL 1 -P 12 -indF ../../teosinte_parents/angsd_output/teo_parents20e-6.indF -rf ../data/${files[$SLURM_ARRAY_TASK_ID]} -doMaf 1 -doMajorMinor 1 -minMapQ 30 -minQ 20"
+echo $cmd
+eval $cmd
+
+# formally calculate the SFS
+cmd="realSFS $SLURM_ARRAY_TASK_ID.teoparents20.saf 40 -maxIter 100 -P 12 > $SLURM_ARRAY_TASK_ID.teoparents20.sfs"
+echo $cmd
+eval $cmd
+
+# no fiure out region wide thetas
+cmd="angsd -bam ../../teosinte_parents/file.list.txt -out $SLURM_ARRAY_TASK_ID.teosinte20thetas.sfs -doThetas 1 -doSaf 2 -indF ../../teosinte_parents/angsd_output/teo_parents20e-6.indF -pest $SLURM_ARRAY_TASK_ID.teoparents20.sfs -anc ../../teosinte_parents/genomes/TRIP.fa -GL 2 -P 12 -minMapQ 30 -minQ 20"
+echo $cmd
+eval $cmd
+
+# make the .bed file
+cmd="thetaStat make_bed $SLURM_ARRAY_TASK_ID.teosinte20thetas.sfs.thetas.gz"
+echo $cmd
+eval $cmd
+
+#calculate Tajimas D
+cmd="thetaStat do_stat $SLURM_ARRAY_TASK_ID.teosinte20thetas.sfs.thetas.gz -nChr 20 -win 100 -step 50  -outnames $SLURM_ARRAY_TASK_ID.teothetasWindow.gz"
+echo $cmd
+eval $cmd
+
+echo "End Job: "
+date
+```
+
+this script does:
+
+1.  generate an .saf file.
+2.  formally calculate the sfs.
+3.  estimate thetas over the regions of interest.
+4.  convert to a .bed file style output.
+
+The output ending in `.pestPG` needs trimming to remove unneccesary data points (i.e coverage of total 0 over a window, or positions where there is no diversity). This can be achieved with variations of this `awk` one liner.
+
+```
+cat 4.teothetasWindow.gz.pestPG | awk '$14!="0" {print}' | grep -v 'inf' > 4.TajD.txt
+```
+
+This will take a while to run, but after the next step is to draw the sfs, using something like:
+
+```{r,echo = FALSE,fig.width=5,fig.height=10,dpi=300,out.width="680px",height="680px"}
+total<-NULL
+# load in all the sfs files to
+for ( i in 0:4 ) {
+   sfs<-exp(scan(paste0("/Users/simonrenny-byfield/GitHubRepos/custom_cnv/sfs/",i,".teoparents20.sfs")))
+   total<-cbind(total,sfs)
+}#for
+plot.new()
+par(mfrow=c(5,1))
+for ( i in 1:dim(total)[2]) {
+  barplot(total[-c(1,41),i],col="cornflowerblue",names.arg=1:39, ylab="probability",xlab="allele frequency", main = paste0("group ",i))
+}#for
+total<-melt(total)
+total<-cbind(total,"group"=c(rep("0",41),rep("1",41),rep("2",41),rep("3",41),rep("4",41)))
+total<-data.frame(total)
+#head(total)
 
 ```
 
+And what about tajima's D. Lets try to generate some violin plots for *Tajima's D* and *pi* for each of the four categories. Firsly, load in the Tajima's D data from the angsd run above:
+```{r, warning=FALSE}
+all.TD<-NULL
+all.TP<-NULL
+all.ST<-NULL
+# make a list of the labels
+labels<-c("1-5","5-10","10-15","15-20","no CNV")
+#labels<-factor(labels[c(5,1,2,3,4)])
+# use data.table to load in the large data sets.
+for ( i in c(0:4) ) {
+    # for pi
+    print(paste0("grp",i))
+    print(labels[i+1])
+    d.f<-fread(paste0("/Users/simonrenny-byfield/GitHubRepos/custom_cnv/sfs/short",i,".TajD.txt"), sep="\t")
+    p.f<-subset(d.f, select=c("chr","start","stop","tP","nSites"))
+    p.f$tP<-subset(p.f,select="tP")/subset(d.f, select="nSites")
+    #p.f<-subset(p.f, select=c("tP"))
+    p.f<-cbind(p.f,"grp"=rep(labels[i+1],length(d.f$tP)))
+    all.TP<-rbind(p.f,all.TP)
+    # for Tajima's D
+    t.f<-subset(d.f, select=c("chr","start","stop","Tajima","nSites"))
+    t.f<-cbind(t.f,"grp"=rep(labels[i+1],length(t.f$Tajima)))
+    all.TD<-rbind(t.f,all.TD)
+    # theta singletons
+    sn.df<-subset(d.f, select=c("chr","start","stop","tF","nSites"))
+    sn.df$tF<-sn.df$tF/sn.df$nSites
+    #sn.df<-subset(sn.df, select=c("tF"))
+    sn.df<-cbind(sn.df,"grp"=rep(labels[i+1],length(sn.df$tF)))
+    all.ST<-rbind(sn.df,all.ST)
+}#for
+
+pi.df<-melt(subset(all.TP,select=c("tP","grp")))
+TD.df<-melt(subset(all.TD,select=c("Tajima","grp")))
+sn.df<-melt(subset(all.ST,select=c("tF","grp")))
+labels<-factor(labels[c(5,1,2,3,4)])
+ pi.df$grp<-factor(pi.df$grp,levels=labels)
+ TD.df$grp<-factor(TD.df$grp,levels=labels)
+ sn.df$grp<-factor(sn.df$grp,levels=labels)
+table(TD.df$grp)
+# subset the data
+#samp<-sample(x=1:dim(pi.df)[1],size=200000)
+#pi.df<-pi.df[samp,]
+#TD.df<-TD.df[samp,]
+fun_mean <- function(x){
+  return(round(data.frame(y=mean(x),label=mean(x,na.rm=T)), digits = 3))}
+
+ggplot(data=pi.df, aes(y=pi.df$value,x=pi.df$grp,fill=pi.df$grp)) +
+    geom_boxplot(alpha=0.7,outlier.shape=NA) +
+    stat_summary(fun.y = "mean", geom = "point", color="white", size= 2, color= "white") +
+    stat_summary(fun.data = fun_mean, geom="text", vjust=-1, size=2) +
+    ylab("nucleotide diversity") +
+    xlab("CNV status") +
+    ylim(0,0.075)
+ggplot(data=sn.df, aes(y=sn.df$value,x=sn.df$grp,fill=sn.df$grp)) +
+    geom_boxplot(alpha=0.7,outlier.shape=NA) +
+    stat_summary(fun.y = "mean", geom = "point", color="white", size= 2, color= "white") +
+    stat_summary(fun.data = fun_mean, geom="text", vjust=-1, size=2) +
+    ylab("singleton nucleotide diversity") +
+    xlab("CNV status") +
+    ylim(0,0.075)
+ggplot(data=TD.df, aes(y=TD.df$value,x=TD.df$grp,fill=TD.df$grp)) +
+    geom_boxplot(alpha=0.7,outlier.shape=NA) +
+    stat_summary(fun.y = "mean", geom = "point", color="white", size= 2, color= "white") +
+    stat_summary(fun.data = fun_mean, geom="text", vjust=-1, size=2) +
+    ylab("Tajima's D") +
+    xlab("CNV status")
+    #ylim(0,0.2)
+    #facet_wrap(~variable)
+#add a small value to sn.df so you can log
+sn.df$value<-sn.df$value+0.0001
+ggplot(data=TD.df, aes(x=TD.df$value, fill=TD.df$grp)) +
+    geom_density(alpha=0.15)
+
+  ggplot(data=sn.df, aes(x=sn.df$value,fill=sn.df$grp)) +
+    scale_x_log10() +
+    geom_density(alpha=0.15)
+hist(sn.df$value)
+hist(TD.df$value, col = alpha("red2",0.7), main="Tajima's D", xlab="Tajima's D")
+```
+
+##Now let's look an the ancient sub-genomes of maize##
+
+We have the genes by sub-genome (from the James Schnable paper in [PNAS](http://www.pnas.org/content/108/10/4069.abstract)) and how do patterns of diversity look like in these two groups. We can as several questions:
+
+[1] Is gene loss ongoing in the wild population of teosinte (it seems yes in this case) and 
+[2] is there significant bias in gene loss between maize one an maize 2 sub-genomes?
+[3] are patterns of diversity different in the two sub-genomes?
+
+Firstly let's load in the sub-genome data?
+
+```{r,warning=FALSE}
+subGenomes<-read.csv("/Users/simonrenny-byfield/GitHubRepos/custom_cnv/data/gene_by_sugenome.csv",na.strings=c("",".","NA"))
+colnames(subGenomes)<-c("Sorgham","maize1","maize2")
+```
+
+and then the gene co-ordinates
+```{r}
+# now load in the gene co-ordiantes
+gene.bed<-read.table("/Users/simonrenny-byfield/maize_genome/GeneZeaRefV3.bed")
+# make a GrangesObject: add 1 to each poisition (bed files are ofset by -1).
+GRgenes<-GRanges(seqnames=gene.bed$V1, ranges = IRanges(start=gene.bed$V2-1, end=gene.bed$V3-1, names = gene.bed$V4))
+
+# make GRanges objects containing all the pop gen estimates
+all.TD<-GRanges(seqnames=all.TD$chr, ranges = IRanges(start=all.TD$start, end=all.TD$stop), TD = all.TD$Tajima, Pi=all.TP$tP , single=all.ST$tF)
+
+# get the gene names
+hits<-findOverlaps(all.TD,GRgenes,ignore.strand = TRUE, minoverlap=1, type="any")
+
+# find the indices of the matches
+sub_indx<-subjectHits(hits)
+querry_indx<-queryHits(hits)
+# attribute those gene names to our new dat set
+subPodata<-all.TD[querry_indx]
+names(subPodata)<-names(GRgenes)[sub_indx]
+```
+
+Now, let's do some exploratory data analysis, can we see a difference in pop-gen signature across the two different sub-genomes?
+
+First look at Tajima's D in the two sub-genomes:
+
+```{r}
+
+# now reduce the data set to maize1 and maize2
+TDmaize1<-subPodata[names(subPodata) %in% subGenomes$maize1]
+TDmaize2<-subPodata[names(subPodata) %in% subGenomes$maize2]
+
+boxplot(TDmaize1$TD,TDmaize2$TD, col = c("blue","red"), main="", names=c("maize1","maize2"), ylab="Tajima's D")
+boxplot(log(TDmaize1$Pi),log(TDmaize2$Pi), ylim=c(0,-10), col = c("blue","red"),names=c("maize1","maize2"),ylab="Tajima's D")
+hist(TDmaize1$TD,col="blue", xlab="Tajima's D", main="")
+hist(TDmaize2$TD, col="red", add=T)
+
+hist(log(TDmaize1$Pi),col="blue", xlab="log(Pi)", main="")
+hist(log(TDmaize2$Pi), col="red", add=T)
+
+hist(log(TDmaize1$single),col="blue", xlab="log(singleton diversity)", main="")
+hist(log(TDmaize2$single), col="red", add=T)
+```
+
+It doesn't seem that there is any appreciable difference between genes on maize1 and maize2 sub-genomes in terms of Pi, singleton dversity and Tajima's D. But another comparison might be to compare Tajima's D et al., beween paralogs. That is compare maize1 gene X with maize2 gene X' and see if there is a difference between them from this point of view.
+
+```{r}
+
+# first lets grab the maize1 and maize2 genes that have paralogs in both sub-genomes.
+subParalogs<-na.omit(subGenomes)
+# remove genes not starting with GRM
+subParalogs<-subParalogs[-grepl("AC",subParalogs[,2]),]
+subParalogs<-subParalogs[-grepl("AC",subParalogs[,3]),]
+
+# and the ones we don;'t have a record for in the gene set, likely because of a name change
+subParalogs<-subParalogs[subParalogs[,2] %in% names(subPodata),]
+subParalogs<-subParalogs[subParalogs[,3] %in% names(subPodata),]
+
+# actaully access the genes
+paraTD1<-subPodata[names(subPodata) %in% subParalogs$maize1 ]
+paraTD2<-subPodata[names(subPodata) %in% subParalogs$maize2 ]
+
+# turn into a data.frame
+paraTD1<-data.frame(names=names(paraTD1),TD=paraTD1$TD,Pi=paraTD1$Pi)
+paraTD2<-data.frame(names=names(paraTD2),TD=paraTD2$TD,Pi=paraTD2$Pi)
+# then a data.table
+paraTD1<-data.table(paraTD1)
+paraTD2<-data.table(paraTD2)
+# find summary statistics by gene
+m1meanTD<-aggregate(paraTD1$TD, by=list(paraTD1$names), FUN=mean)
+m2meanTD<-aggregate(paraTD2$TD, by=list(paraTD2$names), FUN=mean)
+
+m1meanPi<-aggregate(paraTD1$Pi, by=list(paraTD1$names), FUN=mean)
+m2meanPi<-aggregate(paraTD2$Pi, by=list(paraTD2$names), FUN=mean)
+
+# plot something interesring
+
+vioplot(m1meanTD$x,m2meanTD$x, col="tomato", names=c("maize1","maize2"))
+title(ylab="Tajima's D", xlab="", cex.lab=1.2)
+# now directly compare the estimate of Tajim's D in each paralog pair using a smoothed scatter plot
+smoothScatter(m1meanTD$x,m2meanTD$x, xlab="maize1 Tajima's D", ylab="maize2 Tajima's D")
+points(m1meanTD$x,m2meanTD$x, cex=0.2, pch = 1)
+```
+
+These plots suggest no difference between maize1 and miaze2 in terms of Tajima's D, but we are looking at "retained" genes after the fact that much of the fractionation has already happened. I wonder if there is a way to get at what the deleted genes might have looked like... seems impossible. But....
+
+We can look at genes in maize1 that are retained (when the corresponding maize2 gene is lost, i.e. unique to maize1), and compare these to the the entire spectrum of maize2 genes. Are maize1 retained/maize2 lost genes different from the global average?
+
+```{r}
+# grab maize1 and maize2 unique data sets
+x<-subGenomes[rowSums(is.na(subGenomes)) > 0,]
+singeltonM1<-x[!is.na(x[,2]),2]
+singeltonM2<-x[!is.na(x[,3]),3]
+
+maize1single<-subPodata[names(subPodata) %in% singeltonM1 ]
+maize2single<-subPodata[names(subPodata) %in% singeltonM2 ]
+
+maize1single<-data.frame(names=names(maize1single),TD=maize1single$TD,Pi=maize1single$Pi)
+maize2single<-data.frame(names=names(maize2single),TD=maize2single$TD,Pi=maize2single$Pi)
+
+m1SingleTD<-aggregate(maize1single$TD, by=list(maize1single$names), FUN=mean)
+m2SingleTD<-aggregate(maize2single$TD, by=list(maize2single$names), FUN=mean)
+
+# now plot Tajima's D over singletons
+vioplot(m1SingleTD$x,m2SingleTD$x, col="tomato", names=c("maize1 (singleton)","maize2 (singleton)"))
+vioplot(m1SingleTD$x,m2meanTD$x, col="tomato", names=c("maize1(singleton)","maize2 (all)"))
+vioplot(m1meanTD$x,m2SingleTD$x, col="tomato", names=c("maize1(all)","maize2 (singleton)"))
+
+m1SinglePi<-aggregate(maize1single$Pi, by=list(maize1single$names), FUN=mean)
+m2SinglePi<-aggregate(maize2single$Pi, by=list(maize2single$names), FUN=mean)
+
+vioplot(m1SinglePi$x,m2SinglePi$x, col="tomato", names=c("maize1 (singleton)","maize2 (singleton)"))
+vioplot(m1SinglePi$x,m2meanPi$x, col="tomato", names=c("maize1(singleton)","maize2 (all)"))
+vioplot(m1meanPi$x,m2SinglePi$x, col="tomato", names=c("maize1(all)","maize2 (singleton)"))
+
+```
+
+##What about the prevalence of CNV and PAV calls in the two sub-genomes of maize##
+
+Are CNVs or PAVs more prevalent of the maize1 or maize2 sub-genomes?
+
+```{r}
+dim(cnv.mat)
+cnvMaize1<-rownames(cnv.mat)[rownames(cnv.mat) %in% subGenomes[,2]]
+cnvMaize2<-rownames(cnv.mat)[rownames(cnv.mat) %in% subGenomes[,3]]
+length(cnvMaize1)/length(na.omit(subGenomes[,2])) * 100
+length(cnvMaize2)/length(na.omit(subGenomes[,3])) * 100
+# position these calls on some chromosomes, including maize1 and maize2 genes as well as the CNV calls
+
+# make a function to do this, modifying a previous function
+m1m2plot<-function(dt,chr,cols=rainbow(n=10),lim=-log(pnorm(q=lims[5],mean=0,sd=stddevs[5],lower.tail=FALSE)), m1, m2, cnvs) {
+  # first calculate the total length of the genome of and the position of the chromosomal tick marks
+  total<-sum(chr$BP)
+  #now calculate the tick marks at the end of each chromosome.
+  ticks<-c(0,cumsum(chr$BP))
+  # now the mid point range (i.e where to put the labels)
+  midPoint<-NULL
+  for ( i in 2:length(ticks) ) {
+      midPoint[i]<-ticks[i-1]+((ticks[i]-ticks[i-1])/2)
+  }
+  # save the original positions for use later
+  positionOri<-dt$pos
+  #make a new value for position, as if the chromosomes were laid end to end
+  for ( i in 1:length(chr$CHR) ) {
+    # grab the total to add
+    dt$pos[dt$chr==i]<-ticks[i]+dt$pos[dt$chr==i]
+  } #for
+  midPoint<-midPoint[-1]
+  # now find all the unique chromosome names
+  chrs<-unique(chr$CHR)
+  
+    plot(dt$pos, dt$qval, xaxt="n", xlab="chromosome", ylab="qvalue", col=cols[i],cex=.7,pch=16, type= "n", bty="n",cex.lab=1.3)
+  for ( i in 1:length(chrs) ) {
+    points(dt$pos[dt$chr==i], dt$qval[dt$chr==i], xaxt="n", col=cols[i],cex=.7,pch=16)
+  }
+  
+  plot(dt$pos, dt$qval, xaxt="n", xlab="chromosome", ylab="qvalue", col="grey",cex=.7,pch=16, bty="n",cex.lab=1.3)
+  for ( i in 1:length(chrs) ) {
+    points(dt$pos[dt$chr==i & rownames(dt) %in% m1], dt$qval[dt$chr==i  & rownames(dt) %in% m1], xaxt="n", col="red",cex=.7,pch=16)
+    points(dt$pos[dt$chr==i & rownames(dt) %in% m2], dt$qval[dt$chr==i & rownames(dt) %in% m2], xaxt="n", col="blue",cex=.7,pch=16)
+    points(dt$pos[dt$chr==i & rownames(dt) %in% rownames(cnvs)], dt$qval[dt$chr==i & rownames(dt) %in% rownames(cnvs)], xaxt="n", col="purple",cex=.7,pch=1)
+    
+  }
+  axis(1,at=midPoint,labels=chr$CHR, tick = FALSE,cex.axis=1.3)
+  axis(1,at=ticks,labels=FALSE, tick = TRUE)
+  #abline(h=lim,lwd=2,lty=1)
+  # now for each chromosome plot the data
+  for ( i in 1:length(chrs) ) {
+    plot(positionOri[dt$chr==i], dt$qval[dt$chr==i], col="lightgrey",cex=.7,pch=16, xlab="chromosome", ylab="qvalue")
+    points(positionOri[dt$chr==i & rownames(dt) %in% m1], dt$qval[dt$chr==i  & rownames(dt) %in% m1], xaxt="n", col="red",cex=.7,pch=16)
+    points(positionOri[dt$chr==i & rownames(dt) %in% m2], dt$qval[dt$chr==i & rownames(dt) %in% m2], xaxt="n", col="blue",cex=.7,pch=16)
+    points(positionOri[dt$chr==i & rownames(dt) %in% rownames(cnvs)], dt$qval[dt$chr==i & rownames(dt) %in% rownames(cnvs)], xaxt="n", col="purple",cex=.4,pch=1)
+    abline(h=lim,lwd=2,lty=1)
+  }
+}
+
+pdf("m1m2cnv.pdf",width=7,height=5)
+par(mfrow=c(1,1))
+m1m2plot(res,chr=clen.df,m1=subGenomes[,2],m2=subGenomes[,3], cnvs=cnv.mat)
+dev.off()
+
+plot.new()
+par(mfrow=c(2,2))
+m1m2plot(res,chr=clen.df,m1=subGenomes[,2],m2=subGenomes[,3], cnvs=cnv.mat)
+
+
+```
+
+There are only ~50 genes from each sub-genome in our CNV calls. This is crazy. Do we see the same pattern in the Swanson-Wagner paper for TIL01
+
+```{r}
+
+# load in the SW data
+sw<-read.csv("/Users/simonrenny-byfield/GitHubRepos/cn.mops/input_RData/SW_cnv_calls.csv")
+
+length(sw$GeneID[sw$GeneID %in% subGenomes[,2]])
+length(cnvMaize1)
+length(cnvMaize1)/(length(na.omit(subGenomes[,2])))* 100
+length(sw$GeneID[sw$GeneID %in% rownames(cnv.mat)])
+length(cnvMaize2)
+length(cnvMaize2)/(length(na.omit(subGenomes[,3]))) * 100
+```
+
+Now try and see the distribution on ratio (B73/sample) in maize1 and maize2 then vs the global distribution, then the distrbution over the CNV calls:
+
+```{r}
+hist(sub.df$B73.bam, breaks = 60,col=alpha("red",0.4))
+hist(sub.df$B73.bam[sub.df$name %in% subGenomes[,2] | sub.df$name %in% subGenomes[,3]], breaks = 60,col=alpha("blue",0.3), add=TRUE)
+```
+
+Very few of the genes we call as CNV are actually designated maize1 or maize2 (strange, huh). I think this is because in maize1 and maize2 the genes are only segregated and called as a member of either group if they have a syntenic orhtolog in Sorghum. Thus, most of the genes that are segregating as copy-number variants in the wild Palmar Chico population are those genes that appear to be pretty flexible, and are not conserved in terms of gene position over periods of millions of years. Or so it seems..
+
+Next we can try to label all of the genes as belonging to maize1 and maize2 by looking at the designation of their nearest neighbors and projecting outwards (some chromosomes are even all one of the sub-genomes, so they are easy). The rest of the sub-genomes are not too tangled up and I should be able to relatively easily attribute a sub-genomes to most of the genes.  
+
+Once done I wonder if we can begin to see a pattern more pronounced between the sub-genomes?
+
+```{r}
+# turn the dataset into a data.frame
+geneStats<-data.frame(names=names(subPodata),chr=as.numeric(seqnames(subPodata)),TD=subPodata$TD,Pi=subPodata$Pi,single=subPodata$single)
+#remove the strange zma gene
+geneStats<-geneStats[geneStats$names != "zma",]
+#aggregate over genes..
+geneStats<-aggregate(geneStats,by=list(geneStats$names),FUN="mean")
+geneStats<-geneStats[match(unique(names(subPodata[names(subpoData != "zma")])),geneStats$Group.1),]
+subgenome<-rep(as.character("none"),length(geneStats$names))
+
+#find the number of genes in each chr
+table(geneStats$chr)
+chrStart<-c(1,(cumsum(table(geneStats$chr))[1:9])+1)
+subSeed<-c("m1","m1","m1","m1","m2","m1","m1","m2","m1","m1")
+
+# seed the start of each chromosome with the correct sub-genome
+subgenome[chrStart]<-subSeed
+subgenome[geneStats$Group.1 %in% subGenomes[,2]]<-as.character("m1")
+subgenome[geneStats$Group.1 %in% subGenomes[,3]]<-as.character("m2")
+
+# now fill in teh blanks..
+for ( i in 2:length(subgenome)) {
+  if (subgenome[i] == "none" ) {
+      subgenome[i]<-subgenome[i-1]
+  }#if
+}#for
+```
+
+Now we have attributed each gene to either maize one or maize two we can re-visit the designation of those CNVs and see if the pattern is even more pronounced.
+
+```{r}
+length(rownames(cnv.mat2)[rownames(cnv.mat2) %in% geneStats$Group.1[subgenome == "m1"]])
+length(rownames(cnv.mat2)[rownames(cnv.mat2) %in% geneStats$Group.1[subgenome == "m2"]])
+
+length(rownames(cnv.mat)[rownames(cnv.mat2) %in% names(GRgenes)])
+length(geneStats$Group.1[geneStats$Group.1 %in% names(GRgenes)])
+par(mfrow=c(1,1))
+par(mar=c(2.5,5,2.5,1))
+plot.new()
+
+vioplot(geneStats$TD[subgenome == "m1"],geneStats$TD[subgenome == "m2"], names=c("m1","m2"))
+vioplot(geneStats$Pi[subgenome == "m1"],geneStats$Pi[subgenome == "m2"], names=c("m1","m2"))
+vioplot(geneStats$single[subgenome == "m1"],geneStats$single[subgenome == "m2"], names=c("m1","m2"))
+
+boxplot(geneStats$TD[subgenome == "m1"],geneStats$TD[subgenome == "m2"], names=c("m1","m2"))
+boxplot(geneStats$Pi[subgenome == "m1"],geneStats$Pi[subgenome == "m2"], names=c("m1","m2"))
+boxplot(geneStats$single[subgenome == "m1"],geneStats$single[subgenome == "m2"], names=c("m1","m2"))
+```
+
+It seems when considering the genes that do not have syntenic ortholgos in maize and Sorghum the difference between maize1 and maize2 disappears...
+
+Now lets look at Tajima's D and Pi etc but averaged over each gene.
+
+```{r}
+par(mfrow=c(2,1))
+vioplot(geneStats$TD[geneStats$Group.1 %in% group1 & subgenome == "m1" ],geneStats$TD[geneStats$Group.1 %in% group2 &  subgenome == "m1"],geneStats$TD[geneStats$Group.1 %in% group3 &  subgenome == "m1"],geneStats$TD[geneStats$Group.1 %in% group4 & subgenome == "m1"], col="blue", ylim=c(-2,2))
+title(ylab="Tajima's D", xlab="group")
+vioplot(geneStats$TD[geneStats$Group.1 %in% group1 & subgenome == "m2" ],geneStats$TD[geneStats$Group.1 %in% group2 &  subgenome == "m2"],geneStats$TD[geneStats$Group.1 %in% group3 &  subgenome == "m2"],geneStats$TD[geneStats$Group.1 %in% group4 & subgenome == "m2"], col="red", ylim=c(-2,2))
+title(ylab="Tajima's D", xlab="group")
+```
