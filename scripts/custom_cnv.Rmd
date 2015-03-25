@@ -332,7 +332,7 @@ for ( s in samples ) {
      border=alpha("cornflowerblue",0.4), breaks=200)
   # calculate the CNV "limit
   #limit<-qnorm(0.05/(dim(gcNorm)[1]),lower.tail=FALSE)
-  limit<-2
+  limit<-3
   linePos<-mean(ratio)+(limit*stdev)
   lims<-c(lims,min(mean(ratio)+linePos),abs(mean(ratio)-linePos))
   abline(v=mean(ratio), col = "black", lwd=2, lty = "solid",lend=1)
@@ -730,16 +730,17 @@ First look at Tajima's D in the two sub-genomes:
 TDmaize1<-subPodata[names(subPodata) %in% subGenomes$maize1]
 TDmaize2<-subPodata[names(subPodata) %in% subGenomes$maize2]
 
-boxplot(TDmaize1$TD,TDmaize2$TD, col = c("blue","red"), main="", names=c("maize1","maize2"), ylab="Tajima's D")
-boxplot(log(TDmaize1$Pi),log(TDmaize2$Pi), ylim=c(0,-10), col = c("blue","red"),names=c("maize1","maize2"),ylab="Tajima's D")
-hist(TDmaize1$TD,col="blue", xlab="Tajima's D", main="")
-hist(TDmaize2$TD, col="red", add=T)
+boxplot(TDmaize1$TD,TDmaize2$TD, col = c("red","blue"), main="", names=c("maize1","maize2"), ylab="Tajima's D")
 
-hist(log(TDmaize1$Pi),col="blue", xlab="log(Pi)", main="")
-hist(log(TDmaize2$Pi), col="red", add=T)
+boxplot(log(TDmaize1$Pi),log(TDmaize2$Pi), ylim=c(0,-10), col = c("red","blue"),names=c("maize1","maize2"),ylab="Tajima's D")
+hist(TDmaize1$TD,col="red", xlab="Tajima's D", main="")
+hist(TDmaize2$TD, col="blue", add=T)
 
-hist(log(TDmaize1$single),col="blue", xlab="log(singleton diversity)", main="")
-hist(log(TDmaize2$single), col="red", add=T)
+hist(log(TDmaize1$Pi),col="red", xlab="log(Pi)", main="")
+hist(log(TDmaize2$Pi), col="blue", add=T)
+
+hist(log(TDmaize1$single),col="red", xlab="log(singleton diversity)", main="")
+hist(log(TDmaize2$single), col="blue", add=T)
 ```
 
 It doesn't seem that there is any appreciable difference between genes on maize1 and maize2 sub-genomes in terms of Pi, singleton dversity and Tajima's D. But another comparison might be to compare Tajima's D et al., beween paralogs. That is compare maize1 gene X with maize2 gene X' and see if there is a difference between them from this point of view.
@@ -803,15 +804,21 @@ m2SingleTD<-aggregate(maize2single$TD, by=list(maize2single$names), FUN=mean)
 
 # now plot Tajima's D over singletons
 vioplot(m1SingleTD$x,m2SingleTD$x, col="tomato", names=c("maize1 (singleton)","maize2 (singleton)"))
+title(ylab="Tajima's D", xlab="", cex.lab=1.2)
 vioplot(m1SingleTD$x,m2meanTD$x, col="tomato", names=c("maize1(singleton)","maize2 (all)"))
+title(ylab="Tajima's D", xlab="", cex.lab=1.2)
 vioplot(m1meanTD$x,m2SingleTD$x, col="tomato", names=c("maize1(all)","maize2 (singleton)"))
+title(ylab="Tajima's D", xlab="", cex.lab=1.2)
 
 m1SinglePi<-aggregate(maize1single$Pi, by=list(maize1single$names), FUN=mean)
 m2SinglePi<-aggregate(maize2single$Pi, by=list(maize2single$names), FUN=mean)
 
 vioplot(m1SinglePi$x,m2SinglePi$x, col="tomato", names=c("maize1 (singleton)","maize2 (singleton)"))
+title(ylab="Pi", xlab="", cex.lab=1.2)
 vioplot(m1SinglePi$x,m2meanPi$x, col="tomato", names=c("maize1(singleton)","maize2 (all)"))
+title(ylab="Pi", xlab="", cex.lab=1.2)
 vioplot(m1meanPi$x,m2SinglePi$x, col="tomato", names=c("maize1(all)","maize2 (singleton)"))
+title(ylab="Pi", xlab="", cex.lab=1.2)
 
 ```
 
@@ -914,14 +921,14 @@ Next we can try to label all of the genes as belonging to maize1 and maize2 by l
 
 Once done I wonder if we can begin to see a pattern more pronounced between the sub-genomes?
 
-```{r}
+```{r, warning=FALSE, message=FALSE}
 # turn the dataset into a data.frame
 geneStats<-data.frame(names=names(subPodata),chr=as.numeric(seqnames(subPodata)),TD=subPodata$TD,Pi=subPodata$Pi,single=subPodata$single)
 #remove the strange zma gene
 geneStats<-geneStats[geneStats$names != "zma",]
 #aggregate over genes..
 geneStats<-aggregate(geneStats,by=list(geneStats$names),FUN="mean")
-geneStats<-geneStats[match(unique(names(subPodata[names(subpoData != "zma")])),geneStats$Group.1),]
+geneStats<-geneStats[match(unique(names(subPodata[names(subPodata)!= "zma"])),geneStats$Group.1),]
 subgenome<-rep(as.character("none"),length(geneStats$names))
 
 #find the number of genes in each chr
@@ -951,7 +958,7 @@ length(rownames(cnv.mat2)[rownames(cnv.mat2) %in% geneStats$Group.1[subgenome ==
 length(rownames(cnv.mat)[rownames(cnv.mat2) %in% names(GRgenes)])
 length(geneStats$Group.1[geneStats$Group.1 %in% names(GRgenes)])
 par(mfrow=c(1,1))
-par(mar=c(2.5,5,2.5,1))
+par(mar=c(2,5,2,1))
 plot.new()
 
 vioplot(geneStats$TD[subgenome == "m1"],geneStats$TD[subgenome == "m2"], names=c("m1","m2"))
@@ -967,10 +974,83 @@ It seems when considering the genes that do not have syntenic ortholgos in maize
 
 Now lets look at Tajima's D and Pi etc but averaged over each gene.
 
-```{r}
-par(mfrow=c(2,1))
-vioplot(geneStats$TD[geneStats$Group.1 %in% group1 & subgenome == "m1" ],geneStats$TD[geneStats$Group.1 %in% group2 &  subgenome == "m1"],geneStats$TD[geneStats$Group.1 %in% group3 &  subgenome == "m1"],geneStats$TD[geneStats$Group.1 %in% group4 & subgenome == "m1"], col="blue", ylim=c(-2,2))
+```{r, echo = FALSE}
+require(devtools)
+require(digest)
+source("/Users/simonrenny-byfield/GitHubRepos/custom_cnv/scripts/vioplot2.R")
+par(mfrow=c(1,1))
+grpNames<-c("No CNV","0-5","5-10","10-15","15-20")
+vioplot2(geneStats$TD[geneStats$Group.1 %in% nullGenes$name & subgenome == "m1" ],geneStats$TD[geneStats$Group.1 %in% group1 & subgenome == "m1" ],geneStats$TD[geneStats$Group.1 %in% group2 &  subgenome == "m1"],geneStats$TD[geneStats$Group.1 %in% group3 &  subgenome == "m1"],geneStats$TD[geneStats$Group.1 %in% group4 & subgenome == "m1"], col="blue", ylim=c(-2.5,2.5), names=grpNames, side="left")
 title(ylab="Tajima's D", xlab="group")
-vioplot(geneStats$TD[geneStats$Group.1 %in% group1 & subgenome == "m2" ],geneStats$TD[geneStats$Group.1 %in% group2 &  subgenome == "m2"],geneStats$TD[geneStats$Group.1 %in% group3 &  subgenome == "m2"],geneStats$TD[geneStats$Group.1 %in% group4 & subgenome == "m2"], col="red", ylim=c(-2,2))
+vioplot2(geneStats$TD[geneStats$Group.1 %in% as.character(nullGenes$name) & subgenome == "m2" ],geneStats$TD[geneStats$Group.1 %in% group1 & subgenome == "m2" ],geneStats$TD[geneStats$Group.1 %in% group2 &  subgenome == "m2"],geneStats$TD[geneStats$Group.1 %in% group3 &  subgenome == "m2"],geneStats$TD[geneStats$Group.1 %in% group4 & subgenome == "m2"], col="red", ylim=c(-2.5,2.5),names=grpNames, side="right", add=TRUE)
 title(ylab="Tajima's D", xlab="group")
+legend("topright",c("maize1","maize2"), col=c("blue","red"), pch = 15,cex=1.8, bty="n")
 ```
+
+
+##Filtering the impact of tandem duplications in the B73 reference genome##
+
+Jeff mentioned that tandem dups in B73 (derived) could make normal genes appear as CNVs in teosinte (ancestral state) and that we should mitigate this impact by estimating the genes that have duplicates nearby. These can then be correctly scored as normal of CNV.
+
+I performed a BLAST search of the genes agains genes to find the best match for each gene. I limited the number of hits to two (as the first hit a gene has will be against itself), the second hit is therefore the best gene match amongst all the other genes. I used the followign script and a unix one liner to filter the results:
+
+```
+#!/bin/bash
+#/group/jrigrp4/maizeBlast/
+#SBATCH -D /group/jrigrp4/maizeBlast/output
+#SBATCH -o /group/jrigrp4/maizeBlast/logs/blast_out_log-%j.txt
+#SBATCH -e /group/jrigrp4/maizeBlast/logs/blast_err_log-%j.txt
+#SBATCH -J blast
+#SBATCH --cpus-per-task 12
+
+echo "BLAST job starting"
+date
+
+cmd="blastall -p blastn -d ../databases/Zea_mays.AGPv3.22.cdna.all.fa -m 8 -i ../data/Zea_mays.AGPv3.22.cdna.all.fa -v 2 -a 12 -e 0.001 > gene2gene.bln"
+echo $cmd
+eval $cmd
+
+echo "Job Ending:"
+date
+```
+
+and then the unix one liner...
+
+```
+cat gene2gene.bln | sed 's/_T[0-9]*//'g | awk '$1!=$2 {print}' | awk '!a[$1]++' | awk '$11 < 0.0001'
+```
+
+Now the next step is to estimate which of these are tandem dups...
+
+An idea might be to list the genes in order and check how near the dups are based on index of the list of genes (which are ordered by position, of course).
+
+```{r}
+#remove those that are not on the regular chr scaffolds
+seqlevels(GRgenes)<-seqlevels(GRgenes)[c(1,3,4,5,6,7,8,9,10,2)]
+GRgenes<-GRgenes[seqnames(GRgenes) %in% c(1,2,3,4,5,6,7,8,9,10)]
+
+# sort the Granges object
+GRgenes<-rev(GRgenes)
+
+#now import the blast results...
+blastResults<-read.table("/Users/simonrenny-byfield/GitHubRepos/custom_cnv/data/trimmedGene.bln", header = FALSE)
+#find the index of names in col1 and col2
+col1Index<-match(blastResults$V1,names(GRgenes))
+col2Index<-match(blastResults$V2,names(GRgenes))
+indexMat<-cbind(col1Index,col2Index)
+indexMat<-na.omit(indexMat)
+colDiff<-abs(indexMat[,1]-indexMat[,2])
+hist(colDiff, breaks=100)
+indexMat<-indexMat[colDiff<3,]
+
+indexMat[10,]
+
+tandemDups<-GRgenes[as.vector(indexMat)]
+cnv.mat[rownames(cnv.mat) %in% names(tandemDups),]
+rowSums(cnv.mat[rownames(cnv.mat) %in% names(tandemDups),])
+```
+
+
+
+
+
