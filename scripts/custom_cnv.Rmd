@@ -332,7 +332,7 @@ for ( s in samples ) {
      border=alpha("cornflowerblue",0.4), breaks=200)
   # calculate the CNV "limit
   #limit<-qnorm(0.05/(dim(gcNorm)[1]),lower.tail=FALSE)
-  limit<-3
+  limit<-2
   linePos<-mean(ratio)+(limit*stdev)
   lims<-c(lims,min(mean(ratio)+linePos),abs(mean(ratio)-linePos))
   abline(v=mean(ratio), col = "black", lwd=2, lty = "solid",lend=1)
@@ -1049,6 +1049,10 @@ tandemDups<-GRgenes[as.vector(indexMat)]
 cnv.mat[rownames(cnv.mat) %in% names(tandemDups),]
 rowSums(cnv.mat[rownames(cnv.mat) %in% names(tandemDups),])
 ```
+
+
+
+
 
 
 

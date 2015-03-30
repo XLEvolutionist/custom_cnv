@@ -1,0 +1,45 @@
+---
+title: "Copy-number variants in a wild population of maize: Paper outline"
+author: "Simon Renny-Byfield and Jeffrey Ross-Ibarra"
+date: "`r Sys.Date()`"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Vignette Title}
+  %\VignetteEngine{knitr::rmarkdown}
+  \usepackage[utf8]{inputenc}
+---
+
+##Introduction##
+
+Analysis of resequencing data has provided an in-depth look at species-wide variability in maize and teosinte, but we still have little understanding of how evolutionary processes shape diversity within individual populations.  In particular, previous efforts have shown that the vast majority of the maize genome is affected by presence-absence or copy number variation, but we do not yet understand how this genomic flux impacts diversity.  Here, we investigate within-population processes and the role of presence-absence variation by resequencing the genomes of 20 teosinte from a single natural population near Palmar Chico, Mexico.  We scan the genome for evidence of recent positive selection, and identify thousands of presence-absence variants across euchromatic portions of the genome.  We show that patterns of diversity in these regions deviate meaningfully from standard population genetic expectations, and argue that population genetic analysis in complex plant genomes must take into account the effect of such polymorphisms on genome-wide patterns of diversity.
+
+In addition we will examine patter of of nucleotide diversity, Tajima's D, patterns of selection and the prevalence of CNV calls in the two sub-genomes of maize. 
+
+##Methods##
+
+We will use two main methods to examine CNV in the Palmar Chico pop:
+
+1.  A custom CNV calling pipeline, using the distribution of GC corrected coverage (normalized to the reference B73) across all genes on a sample by sample basis.
+
+2. A publicly available program called [cn.mops]("http://bioconductor.org/packages/release/bioc/html/cn.mops.html") is used to estimate copy-number over genomic regions looking at sample wide coverage (this cannot use the reference B73 as a standard).
+
+In principle both of these analyses can be presented together, hopefully each supporting the conclusions of the other. In the following section I will describe the two methods in a little more detail.
+
+###1. Custom CNV calling###
+
+The first method of calling CNVs is one designed by myself. It is relatively simple compared to some of the advanced methods available, but at the time we pursued this because we wanted to totally understand what was going on. As such the paper will require detailed description of exactly what we did to achieve the copy-number estimation.I provide here an outline fo the processes with a few key figures, and the precise code and detailed description can be found at in this GitHub [repo]("https://github.com/XLEvolutionist/custom_cnv/blob/master/scripts/custom_cnv.Rmd").
+
+####1.1 Coverage over genes####
+
+The first step is to estimate coverage over the primary transcripts and use that coverage information, normalized by coverage in B73 and, later GC normalized, to call CNV across the maize genome. Thus, I will estimate coverage over:
+
+* exons 
+* cds
+* 5' UTR 
+* and 3'UTR 
+
+of primary transcripts. Thus the first step will be estimating coverage using `bedtools multicov` as detailed in the above mentioned GitHub [repo]("https://github.com/XLEvolutionist/custom_cnv/blob/master/scripts/custom_cnv.Rmd"). 
+
+####1.2 Normalization####
+
+The data are normalized by reads per kb per million (RPKM) using the script [gene_dpeth.R]("https://github.com/XLEvolutionist/custom_cnv/blob/master/scripts/gene_depth.R") and are then subsequntly GC normalized using the `withinLaneNormalization` of [`EDASeq`](http://bioconductor.org/packages/release/bioc/html/EDASeq.html).
