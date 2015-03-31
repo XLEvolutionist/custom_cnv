@@ -15,6 +15,19 @@ Analysis of resequencing data has provided an in-depth look at species-wide vari
 
 In addition we will examine patter of of nucleotide diversity, Tajima's D, patterns of selection and the prevalence of CNV calls in the two sub-genomes of maize. 
 
+The role of the paper is to address several unanswered but interesting questions regarding CNV in natural populations:
+
+1.  How prevalent are CNVs in a single wild population of maize.
+2.  At what frequency are these CNVs segregating.
+3.  Are CNVs of any "selective significance"
+
+and somewhat separately..
+
+4.  Are CNVs more prevalent in maize1 or maize2?
+5.  Are the patterns of diversity over CNVs variable between the two sub-genomes.
+
+Below I will give a brief outline of the paper, in terms of methods, results so far and future directions/analyses to do.
+
 ##Methods##
 
 We will use two main methods to examine CNV in the Palmar Chico pop:
@@ -27,11 +40,11 @@ In principle both of these analyses can be presented together, hopefully each su
 
 ###1. Custom CNV calling###
 
-The first method of calling CNVs is one designed by myself. It is relatively simple compared to some of the advanced methods available, but at the time we pursued this because we wanted to totally understand what was going on. As such the paper will require detailed description of exactly what we did to achieve the copy-number estimation.I provide here an outline fo the processes with a few key figures, and the precise code and detailed description can be found at in this GitHub [repo]("https://github.com/XLEvolutionist/custom_cnv/blob/master/scripts/custom_cnv.Rmd").
+The first method of calling CNVs is one designed by myself. It is relatively simple compared to some of the advanced methods available, but at the time we pursued this because we wanted to totally understand what was going on. As such the paper will require detailed description of exactly what we did to achieve the copy-number estimation.I provide here an outline of the processes with a few key figures, and the precise code and detailed description can be found at in this GitHub [repo]("https://github.com/XLEvolutionist/custom_cnv/blob/master/scripts/custom_cnv.Rmd").
 
 ####1.1 Coverage over genes####
 
-The first step is to estimate coverage over the primary transcripts and use that coverage information, normalized by coverage in B73 and, later GC normalized, to call CNV across the maize genome. Thus, I will estimate coverage over:
+The first step is to estimate coverage over the primary transcripts and use that coverage information, normalized by GC content and later GC by relation to coverage in B73, to call CNV across the maize genome. Thus, I will estimate coverage over:
 
 * exons 
 * cds
@@ -42,4 +55,100 @@ of primary transcripts. Thus the first step will be estimating coverage using `b
 
 ####1.2 Normalization####
 
-The data are normalized by reads per kb per million (RPKM) using the script [gene_dpeth.R]("https://github.com/XLEvolutionist/custom_cnv/blob/master/scripts/gene_depth.R") and are then subsequntly GC normalized using the `withinLaneNormalization` of [`EDASeq`](http://bioconductor.org/packages/release/bioc/html/EDASeq.html).
+The data are normalized by reads per kb per million (RPKM) using the script [gene_dpeth.R]("https://github.com/XLEvolutionist/custom_cnv/blob/master/scripts/gene_depth.R") and are then subsequently GC normalized using the `withinLaneNormalization` of [`EDASeq`](http://bioconductor.org/packages/release/bioc/html/EDASeq.html).
+
+<table>
+<tr><td><img src="/Users/simonrenny-byfield/GitHubRepos/custom_cnv/figures/preNorm.tiff" width="350" height="275" alt="Computer Hope"/> 
+<td><img src="/Users/simonrenny-byfield/GitHubRepos/custom_cnv/figures/postNorm.tiff" width="350" height="275" alt="Computer Hope"/>
+</tr>
+</table>
+
+
+####1.3 Comparing to B73 reference####
+
+The coverage over intervals within then normalized by dividing by coverage over the same region in the reference sample B73.
+
+CNVs are scored by being 2 (or 3) Standard deviation away from the mean coverage over all intervals. This is performed separately for each sample and an example is given below. The left panel is distribution of coverage over all intervals in sample JRIAL2A, and the right panel is the ratio of coverage in the sample and B73. The vertical lines (dashed) indicate the standard deviation limit and the coloured lines indicate the CNV calls for that sample.
+
+<img src="/Users/simonrenny-byfield/GitHubRepos/custom_cnv/figures/coverageRatio.tiff" width="700" height="275" alt="Computer Hope"/>
+
+I doubt we will need to show this in the main paper but we will have to add to supplementary info, I reckon.
+
+###2. cn.mops###
+
+This is much easier in terms of methods, we just cite the paper and declare our parameters. I think maybe only a brief sentence or two about what `cn.mops` does is needed.
+
+The problem will be how to integrate the two approaches...
+<br>
+<br>
+
+##Results##
+
+<br>
+
+###1. Calling CNVs###
+
+At the moment the custom approach reveals between ~3,000 to 5,000 (depending on the stdev cut-off) in the single wild Palmar Chico population. A plot like the one below should probably be included in the paper.
+
+<table>
+<tr><td><img src="/Users/simonrenny-byfield/GitHubRepos/custom_cnv/figures/heat.tiff" width="350" height="250" alt="Computer Hope"/>
+<td><img src="/Users/simonrenny-byfield/GitHubRepos/custom_cnv/figures/sfs.tiff" width="350" height="250" alt="Computer Hope"/>
+</tr>
+</table>
+
+These are of varying frequency, as you can see from the following sfs.. Lots of low frequency variants with very few fixed across the population.
+
+This will of course change over in the future, we have decided to quantify the actual copy-number rather than the number of individuals exhibiting down CNVs.
+
+Also, we will want to look to see if the majority of CNVs are in *HWE*. THwy should be, and this will add weight to them being real.
+
+###2. Patterns of diversity across CNVs###
+
+The next part of the paper should detail the patterns of diversity over CNV regions and compare these to regions of the genome that are "normal". We can compare:
+
+* pi 
+* singleton diversity and 
+* Tajima's D. 
+
+At the moment we cannot find a particularly strong signal (if any). In response we have decided to examine these patterns over exon, cds, 5' UTR and 3'UTR. Here is a place holder figure, but this will change for the paper.
+
+<table>
+<tr><td><img src="/Users/simonrenny-byfield/GitHubRepos/custom_cnv/figures/Pi.tiff" width="350" height="250" alt="Computer Hope"/>
+<td><img src="/Users/simonrenny-byfield/GitHubRepos/custom_cnv/figures/TajD.tiff" width="350" height="250" alt="Computer Hope"/>
+</tr>
+</table>
+
+The idea is that we will see varying patterns of nucleotide diversity across CNVs at different frequencies. Perhaps more negative Tajima's D in regions that show high copy-number CNVs....
+
+
+###3. Comparing maize1 and miaze2###
+
+Next, I think we should move on to examine maize1 and maize2 sub-genomes with respect to both the number of resident CNVs and the various estimates of Pi, singelton diversity and Tajima's D. This should automatically include information on copy-number variants.
+
+It looks as though there might be a an interesting pattern, at the moment we really need to wait for the more recent analysis to come through. Here is a place holder figure, we should probably have something like this:
+
+<img src="/Users/simonrenny-byfield/GitHubRepos/custom_cnv/figures/maize1_vs_maize2.tiff" width="650" height="450" alt="Computer Hope"/>
+
+We can also use [*Variant Effect Predictor*]("http://www.ensembl.org/info/docs/tools/vep/index.html") to analyse and asses the impact of variants segregating within the population. Do maize1 and miaze2 seem to be effected equally by variants of different sorts? etc etc.
+
+###4. Patterns of selection across the maize Genome###
+
+Tim will, when has has a moment, perform genome-wide estimates of selection in this wild population of teosinte. This is nice and should dovetail with the previous two sections. For example we can:
+
+1.  Ask how much of the genome is affected by selection
+2.  Compare the impacts of selection on normal vs CNV regions ( i.e. are CNVs selected against?).
+3.  Should researchers take inot account CNVs when looking for patterns of selection.
+4.  Compare patterns of selection in maize1 vs maize2
+5.  Link these to patterns of TajD, Pi and singleton diversity as well as outpout from `Variant Effect Predictor`.
+
+##Discussion and Conclusion##
+
+As the data are not yet fully developed I think it is pretty difficult to predict what we might be worthy of discussion. However, there were a few points that will need to be covered in the discussion section:
+
+1.  The remarkably large number of CNV calls within a single pop, there are almost certainly more if we sample more.
+2.  The merits of our own approach vs those of cn.mops and others.
+3.  What do the patterns of Pi, TajD and Singleton diversity tell us about segregating CNVs?
+4.  Does this impact the inference of selection across the genome.
+5. Hopefully something about the difference betweem maize1 and maize2, and what we can infer about the ongoing process of fractionation.
+ 
+

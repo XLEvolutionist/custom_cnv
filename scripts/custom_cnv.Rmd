@@ -332,7 +332,7 @@ for ( s in samples ) {
      border=alpha("cornflowerblue",0.4), breaks=200)
   # calculate the CNV "limit
   #limit<-qnorm(0.05/(dim(gcNorm)[1]),lower.tail=FALSE)
-  limit<-2
+  limit<-3
   linePos<-mean(ratio)+(limit*stdev)
   lims<-c(lims,min(mean(ratio)+linePos),abs(mean(ratio)-linePos))
   abline(v=mean(ratio), col = "black", lwd=2, lty = "solid",lend=1)
@@ -1024,7 +1024,7 @@ Now the next step is to estimate which of these are tandem dups...
 
 An idea might be to list the genes in order and check how near the dups are based on index of the list of genes (which are ordered by position, of course).
 
-```{r}
+```{r,eval=FALSE}
 #remove those that are not on the regular chr scaffolds
 seqlevels(GRgenes)<-seqlevels(GRgenes)[c(1,3,4,5,6,7,8,9,10,2)]
 GRgenes<-GRgenes[seqnames(GRgenes) %in% c(1,2,3,4,5,6,7,8,9,10)]

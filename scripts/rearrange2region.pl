@@ -6,8 +6,8 @@ use warnings;
 
 while (<>) {
 	my @data = split /\s+/;
-	$_ =~ m/Name=(\w+)_/;
-	print "$data[0]:$data[1]-$data[2]\t$data[3]\t$1\n";
+	#$_ =~ m/Name=(\w+)_/;
+	print "$data[0]:$data[1]-$data[2]\t$data[3]\t$data[4]\n";
 	#print join ( "\t" , @data[0..3] ) , "\t" , $1 , "\n";
 }#while
 
