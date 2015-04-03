@@ -903,10 +903,10 @@ There are only ~50 genes from each sub-genome in our CNV calls. This is crazy. D
 sw<-read.csv("/Users/simonrenny-byfield/GitHubRepos/cn.mops/input_RData/SW_cnv_calls.csv")
 
 length(sw$GeneID[sw$GeneID %in% subGenomes[,2]])
-(length(cnvMaize1)/dim(cnvdf)[1])*100
+#(length(cnvMaize1)/dim(cnvdf)[1])*100
 length(cnvMaize1)/(length(na.omit(subGenomes[,2])))* 100
 length(sw$GeneID[sw$GeneID %in% rownames(cnv.mat)])
-(length(cnvMaize2)/dim(cnvdf)[1])*100
+#(length(cnvMaize2)/dim(cnvdf)[1])*100
 length(cnvMaize2)/(length(na.omit(subGenomes[,3]))) * 100
 ```
 
