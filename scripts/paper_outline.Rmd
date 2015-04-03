@@ -19,12 +19,21 @@ The role of the paper is to address several unanswered but interesting questions
 
 1.  How prevalent are CNVs in a single wild population of maize.
 2.  At what frequency are these CNVs segregating.
-3.  Are CNVs of any "selective significance"
+3.  Are CNVs of any "selective significance."
+    * Patterns of Pi
+    * PiN and PiS
+    * Tajima's D
+    * DN/DS
 
 and somewhat separately..
 
 4.  Are CNVs more prevalent in maize1 or maize2?
 5.  Are the patterns of diversity over CNVs variable between the two sub-genomes.
+    * Patterns of Pi
+    * PiN and PiS
+    * Tajima's D
+    * DN/DS
+6.  How might these observations inform us on the process of fractionation.
 
 Below I will give a brief outline of the paper, in terms of methods, results so far and future directions/analyses to do.
 
@@ -127,7 +136,7 @@ Next, I think we should move on to examine maize1 and maize2 sub-genomes with re
 
 It looks as though there might be a an interesting pattern, at the moment we really need to wait for the more recent analysis to come through. Here is a place holder figure, we should probably have something like this:
 
-<img src="/Users/simonrenny-byfield/GitHubRepos/custom_cnv/figures/maize1_vs_maize2.tiff" width="650" height="450" alt="Computer Hope"/>
+<centre><img src="/Users/simonrenny-byfield/GitHubRepos/custom_cnv/figures/maize1_vs_maize2.tiff" width="500" height="350" alt="Computer Hope"  class="centeredImage"/></centre>
 
 We can also use [*Variant Effect Predictor*]("http://www.ensembl.org/info/docs/tools/vep/index.html") to analyse and asses the impact of variants segregating within the population. Do maize1 and miaze2 seem to be effected equally by variants of different sorts? etc etc.
 
@@ -149,6 +158,6 @@ As the data are not yet fully developed I think it is pretty difficult to predic
 2.  The merits of our own approach vs those of cn.mops and others.
 3.  What do the patterns of Pi, TajD and Singleton diversity tell us about segregating CNVs?
 4.  Does this impact the inference of selection across the genome.
-5. Hopefully something about the difference betweem maize1 and maize2, and what we can infer about the ongoing process of fractionation.
+5.  Hopefully something about the difference betweem maize1 and maize2, and what we can infer about the ongoing process of fractionation.
  
 

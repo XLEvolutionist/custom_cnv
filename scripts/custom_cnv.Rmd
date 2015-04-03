@@ -195,10 +195,12 @@ up_sw<-subset(gcNorm,subset=name %in% TIL.up$GeneID,select=c(TIL01,B73.bam))
 dim(coverage_sw)
 dim(TIL.genes)
 
+par( mar=c(5, 4, 4, 2) + 0.1)
 # plot a histgoram of TIL1
-hist(gcNorm$TIL01, main ="TIL01 read-depth",
-     xlab="normalized coverage per kb",cex.lab=1.6, breaks = 500, xlim=c(0,40))
-abline(v=down_sw$TIL01,lwd= 0.1,xpd=FALSE,col = "blue")
+plot(density(gcNorm$TIL01), main ="TIL01 read-depth",
+     xlab="normalized coverage per kb",cex.lab=1.6, xlim=c(0,25),col=alpha("red",0.9), lwd= 3)
+lines(density(down_sw$TIL01),lwd= 3,xpd=FALSE,col ="blue")
+legend("topright",c("CGH Chip","read-depth"),col=c("blue","red"), pch = 15, bty ="n", cex=1.3)
 ```
 
 And now how about the up CNVs?:
@@ -332,7 +334,7 @@ for ( s in samples ) {
      border=alpha("cornflowerblue",0.4), breaks=200)
   # calculate the CNV "limit
   #limit<-qnorm(0.05/(dim(gcNorm)[1]),lower.tail=FALSE)
-  limit<-3
+  limit<-2
   linePos<-mean(ratio)+(limit*stdev)
   lims<-c(lims,min(mean(ratio)+linePos),abs(mean(ratio)-linePos))
   abline(v=mean(ratio), col = "black", lwd=2, lty = "solid",lend=1)
@@ -346,8 +348,8 @@ for ( s in samples ) {
   down<-subset(sub.df,subset=sub.df$B73.bam < -abs(mean(ratio)-linePos))
   cnv.mat[rownames(cnv.mat) %in% down$name,s]<--1
   #double check that the calls are in the right place
-  abline(v=down$B73.bam, col="red", lwd=0.6, lty="solid", lend=1)
-  abline(v=up$B73.bam, col="blue", lwd=0.6, lty="solid", lend=1)
+  abline(v=down$B73.bam, col=alpha("red",0.1), lwd=0.1, lty="solid", lend=1)
+  abline(v=up$B73.bam, col=alpha("blue",0.1), lwd=0.1, lty="solid", lend=1)
   abline(v=mean(ratio)-abs(linePos), col = "black", lwd=1, lty = "dashed",lend=1)
   abline(v=mean(ratio)+(linePos), col = "black", lwd=1, lty = "dashed",lend=1)
 }
@@ -863,8 +865,8 @@ m1m2plot<-function(dt,chr,cols=rainbow(n=10),lim=-log(pnorm(q=lims[5],mean=0,sd=
   
   plot(dt$pos, dt$qval, xaxt="n", xlab="chromosome", ylab="qvalue", col="grey",cex=.7,pch=16, bty="n",cex.lab=1.3)
   for ( i in 1:length(chrs) ) {
-    points(dt$pos[dt$chr==i & rownames(dt) %in% m1], dt$qval[dt$chr==i  & rownames(dt) %in% m1], xaxt="n", col="red",cex=.7,pch=16)
-    points(dt$pos[dt$chr==i & rownames(dt) %in% m2], dt$qval[dt$chr==i & rownames(dt) %in% m2], xaxt="n", col="blue",cex=.7,pch=16)
+    points(dt$pos[dt$chr==i & rownames(dt) %in% m1], dt$qval[dt$chr==i  & rownames(dt) %in% m1], xaxt="n", col="blue",cex=.7,pch=16)
+    points(dt$pos[dt$chr==i & rownames(dt) %in% m2], dt$qval[dt$chr==i & rownames(dt) %in% m2], xaxt="n", col="red",cex=.7,pch=16)
     points(dt$pos[dt$chr==i & rownames(dt) %in% rownames(cnvs)], dt$qval[dt$chr==i & rownames(dt) %in% rownames(cnvs)], xaxt="n", col="purple",cex=.7,pch=1)
     
   }
@@ -901,10 +903,10 @@ There are only ~50 genes from each sub-genome in our CNV calls. This is crazy. D
 sw<-read.csv("/Users/simonrenny-byfield/GitHubRepos/cn.mops/input_RData/SW_cnv_calls.csv")
 
 length(sw$GeneID[sw$GeneID %in% subGenomes[,2]])
-length(cnvMaize1)
+(length(cnvMaize1)/dim(cnvdf)[1])*100
 length(cnvMaize1)/(length(na.omit(subGenomes[,2])))* 100
 length(sw$GeneID[sw$GeneID %in% rownames(cnv.mat)])
-length(cnvMaize2)
+(length(cnvMaize2)/dim(cnvdf)[1])*100
 length(cnvMaize2)/(length(na.omit(subGenomes[,3]))) * 100
 ```
 
@@ -952,8 +954,8 @@ for ( i in 2:length(subgenome)) {
 Now we have attributed each gene to either maize one or maize two we can re-visit the designation of those CNVs and see if the pattern is even more pronounced.
 
 ```{r}
-length(rownames(cnv.mat2)[rownames(cnv.mat2) %in% geneStats$Group.1[subgenome == "m1"]])
-length(rownames(cnv.mat2)[rownames(cnv.mat2) %in% geneStats$Group.1[subgenome == "m2"]])
+length(rownames(cnv.mat2)[rownames(cnv.mat2) %in% geneStats$Group.1[subgenome == "m1"]])/length(geneStats$Group.1[subgenome == "m1"]) )
+length(rownames(cnv.mat2)[rownames(cnv.mat2) %in% geneStats$Group.1[subgenome == "m2"]])/length(geneStats$Group.1[subgenome == "m2"])
 
 length(rownames(cnv.mat)[rownames(cnv.mat2) %in% names(GRgenes)])
 length(geneStats$Group.1[geneStats$Group.1 %in% names(GRgenes)])
